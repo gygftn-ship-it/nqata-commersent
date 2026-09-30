@@ -1,0 +1,39 @@
+name: Build Merchant APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Générer le dossier android
+        run: |
+          flutter create --platforms=android --org dz.nqata --project-name nqata_merchant _gen
+          cp -r _gen/android ./android
+          rm -rf _gen
+
+      - name: Permissions et nom de l'app
+        run: |
+          sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <application|' android/app/src/main/AndroidManifest.xml
+          sed -i 's|android:label="nqata_merchant"|android:label="Nqata Pro"|' android/app/src/main/AndroidManifest.xml
+
+      - run: flutter pub get
+      - name: Icône de l'app
+        run: dart run flutter_launcher_icons
+      - run: flutter build apk --release
+
+      - name: Publier l'APK dans Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "pro-${{ github.run_number }}" build/app/outputs/flutter-apk/app-release.apk --repo "${{ github.repository }}" --title "Nqata Pro ${{ github.run_number }}" --notes "Version automatique"
