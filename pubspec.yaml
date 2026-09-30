@@ -1,0 +1,25 @@
+name: nqata_merchant
+description: Nqata Pro - application commerçant (scan, clients, offres)
+publish_to: none
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.3.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  supabase_flutter: ^2.8.0
+  mobile_scanner: ^7.4.2
+  shared_preferences: ^2.3.2
+
+dev_dependencies:
+  flutter_launcher_icons: ^0.14.1
+
+flutter:
+  uses-material-design: true
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "icon.png"
