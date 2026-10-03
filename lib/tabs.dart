@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'main.dart';
+import 'shop_tab.dart';
 
 // ---------- Utilitaires ----------
 class FadeSlideIn extends StatelessWidget {
@@ -42,6 +43,12 @@ String since(String? iso) {
   if (iso == null) return '-';
   final n = DateTime.now().difference(DateTime.parse(iso).toLocal()).inDays;
   return n == 0 ? tr('aujourd\'hui', 'اليوم') : tr('il y a $n j', 'منذ $n يوم');
+}
+
+String until(String? iso) {
+  if (iso == null) return '';
+  final d = DateTime.parse(iso).toLocal();
+  return ' · ${tr('jusqu\'au', 'حتى')} ${d.day}/${d.month}';
 }
 
 void snack(BuildContext context, String m) {
@@ -425,7 +432,7 @@ class OffersTab extends StatefulWidget {
 
 class _OffersTabState extends State<OffersTab> {
   final custom = TextEditingController();
-  int tpl = 0, aud = 0;
+  int tpl = 0, aud = 0, days = 0; // days : 0 = sans limite
   bool busy = false;
 
   static const templates = [
@@ -443,7 +450,7 @@ class _OffersTabState extends State<OffersTab> {
     final title = custom.text.trim().isNotEmpty ? custom.text.trim() : tr(templates[tpl].$1, templates[tpl].$2);
     setState(() => busy = true);
     try {
-      await store.sendOffer(title, audiences[aud].$1);
+      await store.sendOffer(title, audiences[aud].$1, days: days == 0 ? null : days);
       custom.clear();
       snack(context, tr('Offre envoyée aux clients concernés', 'تم إرسال العرض للزبائن المعنيين'));
     } catch (e) {
@@ -476,6 +483,15 @@ class _OffersTabState extends State<OffersTab> {
             onSelectionChanged: (s) => setState(() => aud = s.first),
           ),
           const SizedBox(height: 16),
+          const SizedBox(height: 16),
+          Text(tr('Durée de l\'offre', 'مدة العرض'), style: title),
+          const SizedBox(height: 8),
+          SegmentedButton<int>(
+            segments: [ButtonSegment(value: 0, label: Text(tr('Sans limite', 'بدون حد'))), ButtonSegment(value: 7, label: Text(tr('7 jours', '7 أيام'))), ButtonSegment(value: 30, label: Text(tr('30 jours', '30 يومًا')))],
+            selected: {days},
+            onSelectionChanged: (s) => setState(() => days = s.first),
+          ),
+          const SizedBox(height: 16),
           FilledButton.icon(icon: const Icon(Icons.send), label: Text(tr('Envoyer l\'offre', 'إرسال العرض')), onPressed: busy ? null : _send),
           const SizedBox(height: 24),
           if (store.offers.isNotEmpty) Text(tr('Offres envoyées', 'العروض المرسلة'), style: title),
@@ -484,7 +500,7 @@ class _OffersTabState extends State<OffersTab> {
               contentPadding: EdgeInsets.zero,
               leading: const Icon(Icons.local_offer_rounded, color: brandLight),
               title: Text('${o['title']}'),
-              subtitle: Text('${audiences.firstWhere((a) => a.$1 == o['audience'], orElse: () => audiences[0]).$2} · ${since(o['created_at'] as String?)}'),
+              subtitle: Text('${audiences.firstWhere((a) => a.$1 == o['audience'], orElse: () => audiences[0]).$2} · ${since(o['created_at'] as String?)}${until(o['expires_at'] as String?)}'),
               trailing: IconButton(
                 icon: const Icon(Icons.delete_outline),
                 onPressed: () async {
@@ -500,177 +516,4 @@ class _OffersTabState extends State<OffersTab> {
       },
     );
   }
-}
-
-// ---------- 5. Mon commerce ----------
-class ShopTab extends StatefulWidget {
-  const ShopTab({super.key});
-  @override
-  State<ShopTab> createState() => _ShopTabState();
-}
-
-class _ShopTabState extends State<ShopTab> {
-  late final addr = TextEditingController(text: '${store.shop?['address'] ?? ''}');
-  late final phone = TextEditingController(text: '${store.shop?['phone'] ?? ''}');
-  late final hours = TextEditingController(text: '${store.shop?['hours'] ?? ''}');
-  late final ppv = TextEditingController(text: '${store.shop?['points_per_visit'] ?? 10}');
-  late final thr = TextEditingController(text: '${store.shop?['reward_threshold'] ?? 100}');
-  late final per = TextEditingController(text: '${store.shop?['scan_period_hours'] ?? 24}');
-  final code = TextEditingController();
-  String newRole = 'employee';
-  bool saving = false;
-
-  @override
-  void dispose() {
-    for (final c in [addr, phone, hours, ppv, thr, per, code]) { c.dispose(); }
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final p = int.tryParse(ppv.text), t = int.tryParse(thr.text), h = int.tryParse(per.text);
-    if (p == null || p < 1 || t == null || t < 1 || h == null || h < 0) { snack(context, tr('Nombres invalides', 'أرقام غير صالحة')); return; }
-    setState(() => saving = true);
-    try {
-      await store.updateShop({'address': addr.text.trim(), 'phone': phone.text.trim(), 'hours': hours.text.trim(), 'points_per_visit': p, 'reward_threshold': t, 'scan_period_hours': h});
-      snack(context, tr('Enregistré', 'تم الحفظ'));
-    } catch (e) {
-      snack(context, errText(e));
-    }
-    if (mounted) setState(() => saving = false);
-  }
-
-  Widget _field(TextEditingController c, String l, {bool number = false}) => Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: TextField(controller: c, keyboardType: number ? TextInputType.number : null, decoration: InputDecoration(labelText: l, border: const OutlineInputBorder())),
-      );
-
-  Future<void> _delete() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (d) => AlertDialog(
-        title: Text(tr('Supprimer mon compte ?', 'حذف حسابي؟')),
-        content: Text(tr('Votre compte et vos données seront supprimés définitivement.', 'سيتم حذف حسابك وبياناتك نهائيًا.')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(d, true), child: Text(tr('Supprimer', 'حذف'))),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    try {
-      await store.deleteAccount();
-    } catch (e) {
-      snack(context, errText(e));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => ListenableBuilder(
-        listenable: store,
-        builder: (_, __) {
-          final theme = Theme.of(context);
-          final roles = {'owner': tr('Propriétaire', 'مالك'), 'manager': tr('Gérant', 'مدير'), 'employee': tr('Employé', 'موظف')};
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            FadeSlideIn(
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors: [brandDark, brandLight])),
-                child: Row(children: [
-                  const Icon(Icons.storefront_rounded, color: Colors.white, size: 40),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('${store.shop?['name'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text('${roles[store.role] ?? ''} · ${tr('Actif', 'نشط')}', style: const TextStyle(color: Colors.white70)),
-                    ]),
-                  ),
-                ]),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (store.isOwner) ...[
-              Text(tr('Programme de fidélité', 'برنامج الولاء'), style: theme.textTheme.titleMedium),
-              const SizedBox(height: 10),
-              _field(ppv, tr('Points par visite', 'نقاط لكل زيارة'), number: true),
-              _field(thr, tr('Points pour une récompense', 'نقاط للمكافأة'), number: true),
-              _field(per, tr('Heures entre deux scans du même client', 'ساعات بين مسحين لنفس الزبون'), number: true),
-              const SizedBox(height: 6),
-              Text(tr('Informations du commerce', 'معلومات المتجر'), style: theme.textTheme.titleMedium),
-              const SizedBox(height: 10),
-              _field(addr, tr('Adresse', 'العنوان')),
-              _field(phone, tr('Téléphone', 'الهاتف')),
-              _field(hours, tr('Horaires (ex. 08:00–20:00)', 'ساعات العمل')),
-              FilledButton(onPressed: saving ? null : _save, child: Text(tr('Enregistrer', 'حفظ'))),
-              const SizedBox(height: 24),
-            ] else ...[
-              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.stars_rounded), title: Text('${store.shop?['points_per_visit']} ${tr('points par visite', 'نقاط لكل زيارة')}'), subtitle: Text('${store.threshold} ${tr('points pour une récompense', 'نقطة للمكافأة')}')),
-              const SizedBox(height: 12),
-            ],
-            if (store.manager) ...[
-              Text(tr('Équipe', 'الفريق'), style: theme.textTheme.titleMedium),
-              for (final m in store.team)
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text('${m['display_name']}'),
-                  subtitle: Text(roles['${m['role']}'] ?? '${m['role']}'),
-                  trailing: store.isOwner && m['role'] != 'owner'
-                      ? IconButton(
-                          icon: const Icon(Icons.person_remove_outlined),
-                          onPressed: () async {
-                            try {
-                              await store.removeStaff('${m['user_id']}');
-                            } catch (e) {
-                              snack(context, errText(e));
-                            }
-                          },
-                        )
-                      : null,
-                ),
-              if (store.isOwner) ...[
-                const SizedBox(height: 8),
-                _field(code, tr('Code de la personne à ajouter', 'رمز الشخص المراد إضافته')),
-                Row(children: [
-                  Expanded(
-                    child: SegmentedButton<String>(
-                      segments: [ButtonSegment(value: 'employee', label: Text(roles['employee']!)), ButtonSegment(value: 'manager', label: Text(roles['manager']!))],
-                      selected: {newRole},
-                      onSelectionChanged: (s) => setState(() => newRole = s.first),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton(
-                    onPressed: () async {
-                      try {
-                        await store.addStaff(code.text, newRole);
-                        code.clear();
-                        snack(context, tr('Ajouté à l\'équipe', 'تمت الإضافة للفريق'));
-                      } catch (e) {
-                        snack(context, errText(e));
-                      }
-                    },
-                    child: Text(tr('Ajouter', 'إضافة')),
-                  ),
-                ]),
-              ],
-              const SizedBox(height: 24),
-            ],
-            const Divider(),
-            ListTile(leading: const Icon(Icons.badge_outlined), title: Text('${store.myName} · ${store.email}'), subtitle: Text('${tr('Mon code', 'رمزي')} : ${store.myCode}')),
-            ListTile(
-              leading: const Icon(Icons.language),
-              title: Text(tr('Langue', 'اللغة')),
-              trailing: SegmentedButton<String>(
-                segments: const [ButtonSegment(value: 'fr', label: Text('FR')), ButtonSegment(value: 'ar', label: Text('عربي'))],
-                selected: {lang},
-                onSelectionChanged: (s) => store.setLang(s.first),
-              ),
-            ),
-            ListTile(leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
-            ListTile(leading: const Icon(Icons.delete_forever, color: Colors.red), title: Text(tr('Supprimer mon compte', 'حذف حسابي'), style: const TextStyle(color: Colors.red)), onTap: _delete),
-            const SizedBox(height: 12),
-            const Center(child: Text('Nqata Pro 0.1.0', style: TextStyle(color: Colors.grey))),
-          ]);
-        },
-      );
 }
