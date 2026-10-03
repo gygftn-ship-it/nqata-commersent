@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +9,8 @@ const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
 const supabaseKey = 'sb_publishable_-zL5W-Pf5WMHAZZCONw4_g_RNbjhE5g';
 const brandDark = Color(0xFF0B5F50);
 const brandLight = Color(0xFF14B8A6);
+
+const shopCats = [('cafe', 'Café', 'مقهى'), ('food', 'Alimentation', 'مواد غذائية'), ('health', 'Santé', 'صحة'), ('beauty', 'Beauté', 'تجميل'), ('other', 'Autres', 'أخرى')];
 
 String lang = 'fr';
 String tr(String fr, String ar) => lang == 'ar' ? ar : fr;
@@ -41,6 +44,7 @@ class Store extends ChangeNotifier {
   String? loadError;
   String myName = '', myCode = '';
   Map<String, dynamic>? shop;
+  Map<String, dynamic>? rating; // note moyenne du commerce
   List<Map<String, dynamic>> clients = [], scans = [], offers = [], redeems = [], team = [];
 
   SupabaseClient get sb => Supabase.instance.client;
@@ -68,12 +72,14 @@ class Store extends ChangeNotifier {
   }
 
   Future<void> refresh() async {
+    const basic = 'id, name, status, category, address, phone, hours, points_per_visit, reward_threshold, scan_period_hours';
     try {
-      final rows = await sb
-          .from('shop_staff')
-          .select('role, shops(id, name, status, category, address, phone, hours, points_per_visit, reward_threshold, scan_period_hours)')
-          .eq('user_id', uid)
-          .limit(1);
+      List<dynamic> rows;
+      try {
+        rows = await sb.from('shop_staff').select('role, shops($basic, description, logo_url, cover_url, cover_color, lat, lng)').eq('user_id', uid).limit(1);
+      } catch (_) {
+        rows = await sb.from('shop_staff').select('role, shops($basic)').eq('user_id', uid).limit(1);
+      }
       shop = rows.isEmpty ? null : {...Map<String, dynamic>.from(rows.first['shops'] as Map), 'role': rows.first['role']};
       loadError = null;
     } catch (e) {
@@ -88,12 +94,17 @@ class Store extends ChangeNotifier {
       myCode = (p?['client_code'] as String?) ?? '';
     } catch (_) {}
     if (shop != null && active) {
+      try {
+        rating = await sb.from('shop_ratings').select('avg_rating, reviews_count').eq('shop_id', shopId).maybeSingle();
+      } catch (_) {
+        rating = null;
+      }
       final t = DateTime.now();
       final start = DateTime(t.year, t.month, t.day).toUtc().toIso8601String();
       final r = await Future.wait([
         _q(sb.from('shop_clients').select('client_id, display_name, points, last_scan_at').eq('shop_id', shopId).order('points', ascending: false)),
         _q(sb.from('scans').select('id, client_id, staff_id, points, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false)),
-        _q(sb.from('offers').select('id, title, audience, created_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30)),
+        _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30)),
         _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start)),
         manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId)) : Future.value(<Map<String, dynamic>>[]),
       ]);
@@ -139,8 +150,8 @@ class Store extends ChangeNotifier {
   }
 
   // ----- Actions du commerçant -----
-  Future<void> registerShop(String name, String address, String phone) async {
-    await sb.rpc('register_shop', params: {'p_name': name, 'p_category': 'other', 'p_address': address, 'p_phone': phone});
+  Future<void> registerShop(String name, String category, String address, String phone) async {
+    await sb.rpc('register_shop', params: {'p_name': name, 'p_category': category, 'p_address': address, 'p_phone': phone});
     await refresh();
   }
 
@@ -170,8 +181,13 @@ class Store extends ChangeNotifier {
     await refresh();
   }
 
-  Future<void> sendOffer(String title, String audience) async {
-    await sb.from('offers').insert({'shop_id': shopId, 'title': title, 'audience': audience});
+  Future<void> sendOffer(String title, String audience, {int? days}) async {
+    await sb.from('offers').insert({
+      'shop_id': shopId,
+      'title': title,
+      'audience': audience,
+      if (days != null) 'expires_at': DateTime.now().add(Duration(days: days)).toUtc().toIso8601String(),
+    });
     await refresh();
   }
 
@@ -183,6 +199,19 @@ class Store extends ChangeNotifier {
   Future<void> updateShop(Map<String, dynamic> values) async {
     await sb.from('shops').update(values).eq('id', shopId);
     await refresh();
+  }
+
+  /// Logo ou image de fond : envoyé dans le dossier du commerce (stockage Supabase), puis enregistré sur la fiche.
+  Future<void> uploadImage(String kind, Uint8List bytes, String filename) async {
+    final png = filename.toLowerCase().endsWith('.png');
+    final path = '$shopId/$kind.${png ? 'png' : 'jpg'}';
+    await sb.storage.from('shop-media').uploadBinary(path, bytes, fileOptions: FileOptions(contentType: png ? 'image/png' : 'image/jpeg', upsert: true));
+    final url = '${sb.storage.from('shop-media').getPublicUrl(path)}?v=${DateTime.now().millisecondsSinceEpoch}';
+    await updateShop({kind == 'logo' ? 'logo_url' : 'cover_url': url});
+  }
+
+  Future<void> changePassword(String p) async {
+    await sb.auth.updateUser(UserAttributes(password: p));
   }
 
   Future<void> addStaff(String code, String role) async {
@@ -321,6 +350,7 @@ class RegisterShopPage extends StatefulWidget {
 
 class _RegisterShopPageState extends State<RegisterShopPage> {
   final name = TextEditingController(), address = TextEditingController(), phone = TextEditingController();
+  String cat = 'other';
   bool busy = false;
   String? error;
 
@@ -331,7 +361,7 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
     if (name.text.trim().isEmpty) return;
     setState(() { busy = true; error = null; });
     try {
-      await store.registerShop(name.text.trim(), address.text.trim(), phone.text.trim());
+      await store.registerShop(name.text.trim(), cat, address.text.trim(), phone.text.trim());
     } catch (e) {
       error = errText(e);
     }
@@ -350,6 +380,10 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
           Text(tr('Bienvenue ! Décrivez votre commerce. L\'équipe Nqata le validera avant l\'activation.', 'مرحبًا! صف متجرك. سيقوم فريق نقطة بالموافقة عليه قبل التفعيل.')),
           const SizedBox(height: 16),
           _f(name, tr('Nom du commerce', 'اسم المتجر')),
+          Text(tr('Type de commerce', 'نوع المتجر')),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 4, children: [for (final c in shopCats) ChoiceChip(label: Text(tr(c.$2, c.$3)), selected: cat == c.$1, onSelected: (_) => setState(() => cat = c.$1))]),
+          const SizedBox(height: 12),
           _f(address, tr('Adresse', 'العنوان')),
           _f(phone, tr('Téléphone', 'الهاتف')),
           if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
