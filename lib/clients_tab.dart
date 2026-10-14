@@ -99,6 +99,7 @@ class _ClientsTabState extends State<ClientsTab> {
           };
 
           return Column(children: [
+            if (store.errors['clients'] != null) ErrorBanner(tr('liste des clients', 'قائمة الزبائن'), store.errors['clients']!),
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
               child: Row(children: [
