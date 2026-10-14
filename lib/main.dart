@@ -50,6 +50,7 @@ class Store extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.system;
   // Historique (180 jours) : statistiques et fiche client
   List<Map<String, dynamic>> history = [], redeemHistory = [];
+  final errors = <String, String>{}; // dernière erreur de lecture par source (clients, scans...)
   bool hasAmount = true, historyLoaded = false, historyStale = true, historyLoading = false;
 
   SupabaseClient get sb => Supabase.instance.client;
@@ -68,10 +69,15 @@ class Store extends ChangeNotifier {
     return '—';
   }
 
-  Future<List<Map<String, dynamic>>> _q(Future<dynamic> f) async {
+  String _raw(Object e) => e is PostgrestException ? '${e.message}${e.code != null ? ' [${e.code}]' : ''}' : '$e';
+
+  Future<List<Map<String, dynamic>>> _q(Future<dynamic> f, [String? key]) async {
     try {
-      return List<Map<String, dynamic>>.from(await f);
-    } catch (_) {
+      final r = List<Map<String, dynamic>>.from(await f);
+      if (key != null) errors.remove(key);
+      return r;
+    } catch (e) {
+      if (key != null) errors[key] = _raw(e);
       return [];
     }
   }
@@ -81,10 +87,11 @@ class Store extends ChangeNotifier {
     try {
       final r = await sb.from('scans').select('id, client_id, staff_id, points, amount, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false);
       hasAmount = true;
+      errors.remove('scans');
       return List<Map<String, dynamic>>.from(r);
     } catch (_) {
       hasAmount = false;
-      return _q(sb.from('scans').select('id, client_id, staff_id, points, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false));
+      return _q(sb.from('scans').select('id, client_id, staff_id, points, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false), 'scans');
     }
   }
 
@@ -113,7 +120,10 @@ class Store extends ChangeNotifier {
       hasAmount = false;
       try {
         rows = await load('id, client_id, points, created_at, undone_at');
-      } catch (_) {}
+        errors.remove('history');
+      } catch (e) {
+        errors['history'] = _raw(e);
+      }
     }
     history = rows.where((s) => s['undone_at'] == null).toList();
     try {
@@ -158,11 +168,11 @@ class Store extends ChangeNotifier {
       final t = DateTime.now();
       final start = DateTime(t.year, t.month, t.day).toUtc().toIso8601String();
       final r = await Future.wait([
-        _q(sb.from('shop_clients').select('client_id, display_name, points, last_scan_at').eq('shop_id', shopId).order('points', ascending: false)),
+        _q(sb.from('shop_clients').select('client_id, display_name, points, last_scan_at').eq('shop_id', shopId).order('points', ascending: false), 'clients'),
         _todayScans(start),
-        _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30)),
-        _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start)),
-        manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId)) : Future.value(<Map<String, dynamic>>[]),
+        _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30), 'offers'),
+        _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start), 'redeems'),
+        manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId), 'team') : Future.value(<Map<String, dynamic>>[]),
       ]);
       clients = r[0]; scans = r[1]; offers = r[2]; redeems = r[3]; team = r[4];
       historyStale = true;
