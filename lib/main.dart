@@ -28,6 +28,7 @@ String errText(Object e) {
     'not_enough_points': ['Points insuffisants', 'نقاط غير كافية'],
     'user_not_found': ['Aucun compte avec ce code', 'لا يوجد حساب بهذا الرمز'],
     'bad_role': ['Rôle invalide', 'دور غير صالح'],
+    'bad_amount': ['Montant invalide', 'مبلغ غير صالح'],
     'confirm_email': ['Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول'],
     'Invalid login credentials': ['E-mail ou mot de passe incorrect', 'بريد أو كلمة سر خاطئة'],
     'rate limit': ['Trop d\'e-mails envoyés, réessayez plus tard', 'رسائل كثيرة، حاول لاحقًا'],
@@ -46,6 +47,10 @@ class Store extends ChangeNotifier {
   Map<String, dynamic>? shop;
   Map<String, dynamic>? rating; // note moyenne du commerce
   List<Map<String, dynamic>> clients = [], scans = [], offers = [], redeems = [], team = [];
+  ThemeMode themeMode = ThemeMode.system;
+  // Historique (180 jours) : statistiques et fiche client
+  List<Map<String, dynamic>> history = [], redeemHistory = [];
+  bool hasAmount = true, historyLoaded = false, historyStale = true, historyLoading = false;
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
@@ -69,6 +74,57 @@ class Store extends ChangeNotifier {
     } catch (_) {
       return [];
     }
+  }
+
+  /// Scans du jour. Si la colonne `amount` n'existe pas encore, on retombe sur l'ancienne requête.
+  Future<List<Map<String, dynamic>>> _todayScans(String start) async {
+    try {
+      final r = await sb.from('scans').select('id, client_id, staff_id, points, amount, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false);
+      hasAmount = true;
+      return List<Map<String, dynamic>>.from(r);
+    } catch (_) {
+      hasAmount = false;
+      return _q(sb.from('scans').select('id, client_id, staff_id, points, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false));
+    }
+  }
+
+  /// Lit une table page par page (Supabase renvoie 1000 lignes max par requête).
+  Future<List<Map<String, dynamic>>> _paged(Future<dynamic> Function(int from, int to) page) async {
+    final out = <Map<String, dynamic>>[];
+    for (var i = 0; i < 20; i++) {
+      final r = List<Map<String, dynamic>>.from(await page(i * 1000, i * 1000 + 999));
+      out.addAll(r);
+      if (r.length < 1000) break;
+    }
+    return out;
+  }
+
+  Future<void> loadHistory({bool force = false}) async {
+    if (shop == null || !active || historyLoading) return;
+    if (!force && historyLoaded && !historyStale) return;
+    historyLoading = true;
+    final since = DateTime.now().subtract(const Duration(days: 180)).toUtc().toIso8601String();
+    Future<List<Map<String, dynamic>>> load(String cols) => _paged((a, b) => sb.from('scans').select(cols).eq('shop_id', shopId).gte('created_at', since).order('created_at', ascending: false).range(a, b));
+    List<Map<String, dynamic>> rows = [];
+    try {
+      rows = await load('id, client_id, points, amount, created_at, undone_at');
+      hasAmount = true;
+    } catch (_) {
+      hasAmount = false;
+      try {
+        rows = await load('id, client_id, points, created_at, undone_at');
+      } catch (_) {}
+    }
+    history = rows.where((s) => s['undone_at'] == null).toList();
+    try {
+      redeemHistory = await _paged((a, b) => sb.from('redemptions').select('id, points_cost, created_at').eq('shop_id', shopId).gte('created_at', since).order('created_at', ascending: false).range(a, b));
+    } catch (_) {
+      redeemHistory = [];
+    }
+    historyLoaded = true;
+    historyStale = false;
+    historyLoading = false;
+    notifyListeners();
   }
 
   Future<void> refresh() async {
@@ -103,12 +159,13 @@ class Store extends ChangeNotifier {
       final start = DateTime(t.year, t.month, t.day).toUtc().toIso8601String();
       final r = await Future.wait([
         _q(sb.from('shop_clients').select('client_id, display_name, points, last_scan_at').eq('shop_id', shopId).order('points', ascending: false)),
-        _q(sb.from('scans').select('id, client_id, staff_id, points, created_at, undone_at').eq('shop_id', shopId).gte('created_at', start).order('created_at', ascending: false)),
+        _todayScans(start),
         _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30)),
         _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start)),
         manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId)) : Future.value(<Map<String, dynamic>>[]),
       ]);
       clients = r[0]; scans = r[1]; offers = r[2]; redeems = r[3]; team = r[4];
+      historyStale = true;
     }
     loaded = true;
     notifyListeners();
@@ -135,6 +192,7 @@ class Store extends ChangeNotifier {
   Future<void> signOut() async {
     try { await sb.auth.signOut(); } catch (_) {}
     loggedIn = false; loaded = false; shop = null; clients = []; scans = []; offers = []; redeems = []; team = [];
+    history = []; redeemHistory = []; historyLoaded = false; historyStale = true;
     notifyListeners();
   }
 
@@ -210,6 +268,44 @@ class Store extends ChangeNotifier {
     await updateShop({kind == 'logo' ? 'logo_url' : 'cover_url': url});
   }
 
+  /// Montant de l'achat (pour le panier moyen). Nécessite la fonction SQL `set_scan_amount`.
+  Future<void> setScanAmount(String scanId, double amount) async {
+    await sb.rpc('set_scan_amount', params: {'p_scan': scanId, 'p_amount': amount});
+    historyStale = true;
+    await refresh();
+  }
+
+  Future<void> updateName(String n) async {
+    await sb.from('profiles').update({'display_name': n}).eq('id', uid);
+    myName = n;
+    notifyListeners();
+  }
+
+  void setTheme(ThemeMode m) {
+    themeMode = m;
+    SharedPreferences.getInstance().then((p) => p.setString('theme', m == ThemeMode.light ? 'light' : m == ThemeMode.dark ? 'dark' : 'system'));
+    notifyListeners();
+  }
+
+  // ----- Galerie photos (dossier gallery/ du commerce) -----
+  Future<List<String>> listGallery() async {
+    final bucket = sb.storage.from('shop-media');
+    final files = await bucket.list(path: '$shopId/gallery');
+    final names = files.map((f) => f.name).where((n) => n.isNotEmpty && !n.startsWith('.')).toList()..sort();
+    return [for (final n in names) '${bucket.getPublicUrl('$shopId/gallery/$n')}?v=$n'];
+  }
+
+  Future<void> addGalleryPhoto(Uint8List bytes, String filename) async {
+    final png = filename.toLowerCase().endsWith('.png');
+    final path = '$shopId/gallery/${DateTime.now().millisecondsSinceEpoch}.${png ? 'png' : 'jpg'}';
+    await sb.storage.from('shop-media').uploadBinary(path, bytes, fileOptions: FileOptions(contentType: png ? 'image/png' : 'image/jpeg'));
+  }
+
+  Future<void> removeGalleryPhoto(String url) async {
+    final name = Uri.parse(url).pathSegments.last;
+    await sb.storage.from('shop-media').remove(['$shopId/gallery/$name']);
+  }
+
   Future<void> changePassword(String p) async {
     await sb.auth.updateUser(UserAttributes(password: p));
   }
@@ -229,7 +325,9 @@ final store = Store();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  lang = (await SharedPreferences.getInstance()).getString('lang') ?? 'fr';
+  final prefs = await SharedPreferences.getInstance();
+  lang = prefs.getString('lang') ?? 'fr';
+  store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system };
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataPro());
@@ -261,7 +359,7 @@ class NqataPro extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           theme: _theme(Brightness.light),
           darkTheme: _theme(Brightness.dark),
-          themeMode: ThemeMode.system,
+          themeMode: store.themeMode,
           builder: (c, child) => Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!),
           home: _home(),
         ),
