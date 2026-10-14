@@ -60,6 +60,25 @@ class SectionCard extends StatelessWidget {
       );
 }
 
+/// Bandeau rouge qui montre la vraie erreur de lecture (au lieu d'une liste vide).
+class ErrorBanner extends StatelessWidget {
+  final String what, message;
+  const ErrorBanner(this.what, this.message, {super.key});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(color: Colors.red.withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.red.withOpacity(0.4))),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${tr('Lecture impossible', 'تعذّرت القراءة')} : $what', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          const SizedBox(height: 4),
+          SelectableText(message, style: const TextStyle(fontSize: 12)),
+          Align(alignment: AlignmentDirectional.centerEnd, child: TextButton(onPressed: store.refresh, child: Text(tr('Réessayer', 'إعادة المحاولة')))),
+        ]),
+      );
+}
+
 DateTime localDt(Object? iso) => DateTime.parse('$iso').toLocal();
 
 String hm(String? iso) {
