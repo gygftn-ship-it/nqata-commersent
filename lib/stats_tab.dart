@@ -132,6 +132,7 @@ class _StatsTabState extends State<StatsTab> {
             onRefresh: _reload,
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
               Text(tr('Statistiques', 'الإحصاءات'), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              for (final k in ['history', 'scans']) if (store.errors[k] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [Expanded(child: ErrorBanner(k, store.errors[k]!))])),
               const SizedBox(height: 12),
               // Aujourd'hui
               FadeSlideIn(
