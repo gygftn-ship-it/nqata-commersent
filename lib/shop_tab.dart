@@ -3,6 +3,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 import 'offers_page.dart';
 
 const _covers = ['#6B3F2A', '#B45309', '#15803D', '#0E7490', '#4C1D95', '#BE185D', '#1D4ED8', '#15120B', '#FFD60A'];
@@ -187,7 +188,7 @@ class _ShopTabState extends State<ShopTab> {
   Widget _preview() {
     final shop = store.shop;
     final cover = shop?['cover_url'] as String?, logo = shop?['logo_url'] as String?;
-    final coverColor = _hex(shop?['cover_color'] as String?) ?? brandDark;
+    final coverColor = _hex(shop?['cover_color'] as String?) ?? kInk;
     final r = store.rating;
     final isOpen = _isOpenNow(shop?['hours'] as String?);
     final catLabel = shopCats.firstWhere((c) => c.$1 == '${shop?['category']}', orElse: () => shopCats.last);
@@ -230,13 +231,13 @@ class _ShopTabState extends State<ShopTab> {
       Text('${shop?['name'] ?? ''}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
       const SizedBox(height: 6),
       Wrap(spacing: 8, runSpacing: 6, children: [
-        _chip(tr(catLabel.$2, catLabel.$3), brandDark),
-        if (isOpen != null) _chip(isOpen ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), isOpen ? Colors.green : Colors.red),
-        _chip(r == null ? tr('Pas encore de note', 'لا تقييم بعد') : '★ ${(r['avg_rating'] as num).toStringAsFixed(1)} · ${r['reviews_count']} ${tr('avis', 'تقييم')}', Colors.orange),
+        _chip(tr(catLabel.$2, catLabel.$3), Theme.of(context).colorScheme.onSurface),
+        if (isOpen != null) _chip(isOpen ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), isOpen ? kOk : kDanger),
+        _chip(r == null ? tr('Pas encore de note', 'لا تقييم بعد') : '★ ${(r['avg_rating'] as num).toStringAsFixed(1)} · ${r['reviews_count']} ${tr('avis', 'تقييم')}', kWarn),
       ]),
       if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(description)),
       if (store.isOwner)
-        Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr('Touchez le logo pour le changer.', 'المس الشعار لتغييره.'), style: const TextStyle(fontSize: 12, color: Colors.grey))),
+        Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr('Touchez le logo pour le changer.', 'المس الشعار لتغييره.'), style: const TextStyle(fontSize: 12, color: kMuted))),
     ]);
   }
 
@@ -271,13 +272,13 @@ class _ShopTabState extends State<ShopTab> {
               child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: EdgeInsets.fromLTRB(16, 16, 16, dirty ? 90 : 24), children: [
                 FadeSlideIn(child: _preview()),
                 if (store.isOwner) ...[
-                  SectionCard(title: tr('Photos', 'الصور'), icon: Icons.photo_library_rounded, children: [
+                  SectionCard(title: tr('Photos', 'الصور'), icon: NI.photos, children: [
                     Text(tr('Photos de votre commerce (${gallery.length}/$_maxGallery)', 'صور متجرك (${gallery.length}/$_maxGallery)'), style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
                     if (galleryOk)
                       _galleryGrid()
                     else
-                      Text(tr('Galerie indisponible : exécutez supabase_update.sql (règles de stockage).', 'المعرض غير متاح: نفّذ ملف supabase_update.sql (قواعد التخزين).'), style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                      Text(tr('Galerie indisponible : exécutez supabase_update.sql (règles de stockage).', 'المعرض غير متاح: نفّذ ملف supabase_update.sql (قواعد التخزين).'), style: const TextStyle(fontSize: 12, color: kWarn)),
                     const SizedBox(height: 16),
                     Text(tr('Couleur de fond (si pas d\'image)', 'لون الخلفية (إن لم توجد صورة)'), style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
@@ -293,7 +294,7 @@ class _ShopTabState extends State<ShopTab> {
                         ),
                     ]),
                   ]),
-                  SectionCard(title: tr('Informations', 'المعلومات'), icon: Icons.info_rounded, children: [
+                  SectionCard(title: tr('Informations', 'المعلومات'), icon: NI.info, children: [
                     _field(desc, tr('Description du commerce', 'وصف المتجر'), lines: 4, max: 300),
                     Text(tr('Catégorie', 'الفئة'), style: theme.textTheme.titleSmall),
                     const SizedBox(height: 8),
@@ -307,23 +308,23 @@ class _ShopTabState extends State<ShopTab> {
                       Expanded(child: OutlinedButton(onPressed: () => _pickTime(false), child: Text('${tr('Ferme', 'يغلق')} : ${close == null ? '--:--' : _fmt(close!)}'))),
                     ]),
                     const SizedBox(height: 4),
-                    Text(tr('Les clients voient « Ouvert » ou « Fermé » selon ces horaires.', 'يرى الزبائن «مفتوح» أو «مغلق» حسب هذه الساعات.'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    Text(tr('Les clients voient « Ouvert » ou « Fermé » selon ces horaires.', 'يرى الزبائن «مفتوح» أو «مغلق» حسب هذه الساعات.'), style: const TextStyle(fontSize: 12, color: kMuted)),
                     const SizedBox(height: 16),
                     _field(addr, tr('Adresse', 'العنوان'), icon: Icons.place_outlined),
                     _field(phone, tr('Téléphone', 'الهاتف'), icon: Icons.phone_outlined),
                     OutlinedButton.icon(icon: const Icon(Icons.my_location), label: Text(located ? tr('Mettre à jour ma position', 'تحديث موقعي') : tr('Utiliser ma position actuelle', 'استخدام موقعي الحالي')), onPressed: _locate),
                     Padding(
                       padding: const EdgeInsets.only(top: 6),
-                      child: Text(located ? tr('✓ Votre commerce apparaît sur la carte des clients.', '✓ يظهر متجرك على خريطة الزبائن.') : tr('Placez-vous dans votre commerce, puis touchez le bouton : sinon vous n\'apparaissez pas sur la carte.', 'كن داخل متجرك ثم المس الزر: وإلا فلن تظهر على الخريطة.'), style: TextStyle(fontSize: 12, color: located ? Colors.green : Colors.orange)),
+                      child: Text(located ? tr('✓ Votre commerce apparaît sur la carte des clients.', '✓ يظهر متجرك على خريطة الزبائن.') : tr('Placez-vous dans votre commerce, puis touchez le bouton : sinon vous n\'apparaissez pas sur la carte.', 'كن داخل متجرك ثم المس الزر: وإلا فلن تظهر على الخريطة.'), style: TextStyle(fontSize: 12, color: located ? kOk : kWarn)),
                     ),
                   ]),
-                  SectionCard(title: tr('Programme de fidélité', 'برنامج الولاء'), icon: Icons.stars_rounded, children: [
+                  SectionCard(title: tr('Programme de fidélité', 'برنامج الولاء'), icon: NI.points, children: [
                     _field(ppv, tr('Points par visite', 'نقاط لكل زيارة'), number: true),
                     _field(thr, tr('Points pour une récompense', 'نقاط للمكافأة'), number: true),
                     _field(per, tr('Heures entre deux scans du même client', 'ساعات بين مسحين لنفس الزبون'), number: true),
                   ]),
                 ] else
-                  SectionCard(title: tr('Programme de fidélité', 'برنامج الولاء'), icon: Icons.stars_rounded, children: [
+                  SectionCard(title: tr('Programme de fidélité', 'برنامج الولاء'), icon: NI.points, children: [
                     Text('${store.shop?['points_per_visit']} ${tr('points par visite', 'نقاط لكل زيارة')}'),
                     Text('${store.threshold} ${tr('points pour une récompense', 'نقطة للمكافأة')}'),
                   ]),
@@ -332,10 +333,10 @@ class _ShopTabState extends State<ShopTab> {
                     padding: const EdgeInsets.only(top: 14),
                     child: Material(
                       color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(20),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: theme.colorScheme.outlineVariant)),
                       child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        leading: const Icon(Icons.campaign_rounded, color: brandLight),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        leading: const NIcon(NI.offer),
                         title: Text(tr('Offres et promotions', 'العروض والترويج'), style: const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text('$activeOffers ${tr('offre(s) en cours', 'عرض ساري')}'),
                         trailing: const Icon(Icons.chevron_right_rounded),
@@ -344,7 +345,7 @@ class _ShopTabState extends State<ShopTab> {
                     ),
                   ),
                 if (store.manager)
-                  SectionCard(title: tr('Équipe', 'الفريق'), icon: Icons.group_rounded, children: [
+                  SectionCard(title: tr('Équipe', 'الفريق'), icon: NI.clients, children: [
                     for (final m in store.team)
                       ListTile(
                         contentPadding: EdgeInsets.zero,
@@ -400,7 +401,7 @@ class _ShopTabState extends State<ShopTab> {
                 bottom: 16,
                 child: FilledButton.icon(
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-                  icon: saving ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.save_rounded),
+                  icon: saving ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary)) : const Icon(Icons.save_rounded),
                   label: Text(tr('Enregistrer les modifications', 'حفظ التعديلات')),
                   onPressed: saving ? null : _save,
                 ),
