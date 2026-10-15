@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 
 /// Statistiques d'un client calculées depuis l'historique (6 derniers mois).
 class ClientStat {
@@ -92,7 +93,7 @@ class _ClientsTabState extends State<ClientsTab> {
 
           final labels = {
             _Filter.all: tr('Tous', 'الكل'),
-            _Filter.reward: '🎁 ${tr('Récompense', 'مكافأة')} ($ready)',
+            _Filter.reward: '${tr('Récompense', 'مكافأة')} ($ready)',
             _Filter.loyal: tr('Fidèles (4+ visites)', 'أوفياء (4+ زيارات)'),
             _Filter.fresh: tr('Nouveaux', 'جدد'),
             _Filter.inactive: '${tr('À relancer', 'للتذكير')} ($inactiveCount)',
@@ -106,11 +107,11 @@ class _ClientsTabState extends State<ClientsTab> {
                 Expanded(
                   child: TextField(
                     onChanged: (v) => setState(() => q = v),
-                    decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: '${tr('Rechercher parmi', 'ابحث بين')} ${store.clients.length} ${tr('clients', 'زبون')}', border: const OutlineInputBorder()),
+                    decoration: InputDecoration(prefixIcon: const NIcon(NI.search, size: 22), hintText: '${tr('Rechercher parmi', 'ابحث بين')} ${store.clients.length} ${tr('clients', 'زبون')}', border: const OutlineInputBorder()),
                   ),
                 ),
                 PopupMenuButton<_Sort>(
-                  icon: const Icon(Icons.sort_rounded),
+                  icon: const NIcon(NI.sort),
                   tooltip: tr('Trier', 'ترتيب'),
                   onSelected: (v) => setState(() => sort = v),
                   itemBuilder: (_) => [
@@ -151,7 +152,7 @@ class _ClientsTabState extends State<ClientsTab> {
     final ready = pts >= store.threshold;
     return ListTile(
       onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => ClientSheet(client: c)),
-      leading: CircleAvatar(backgroundColor: ready ? Colors.amber : brandLight.withOpacity(0.25), child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold))),
+      leading: CircleAvatar(backgroundColor: ready ? kAccent : kAccentSoft, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: kInk))),
       title: Text(name),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('$pts ${tr('pts', 'نقطة')} · ${st?.visits ?? 0} ${tr('visites', 'زيارة')} · ${since(c['last_scan_at'] as String?)}'),
@@ -168,7 +169,7 @@ class _ClientsTabState extends State<ClientsTab> {
                   snack(context, errText(e));
                 }
               },
-              child: Text(tr('🎁 Valider', '🎁 تأكيد')),
+              child: Text(tr('Valider', 'تأكيد')),
             )
           : const Icon(Icons.chevron_right_rounded),
     );
@@ -180,11 +181,11 @@ class ClientSheet extends StatelessWidget {
   final Map<String, dynamic> client;
   const ClientSheet({super.key, required this.client});
 
-  Widget _kpi(BuildContext context, IconData i, String v, String l) => Container(
+  Widget _kpi(BuildContext context, Object i, String v, String l) => Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Icon(i, size: 18, color: brandLight),
+          ic(i, size: 20),
           FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
           Text(l, style: const TextStyle(fontSize: 11)),
         ]),
@@ -203,24 +204,24 @@ class ClientSheet extends StatelessWidget {
       constraints: BoxConstraints(maxHeight: h * 0.85),
       child: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 24), shrinkWrap: true, children: [
         Row(children: [
-          CircleAvatar(radius: 28, backgroundColor: brandLight.withOpacity(0.25), child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+          CircleAvatar(radius: 28, backgroundColor: kAccent, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kInk))),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(name, style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-              Text(st?.first == null ? tr('Pas encore de visite enregistrée', 'لا زيارات مسجلة') : '${tr('Client depuis le', 'زبون منذ')} ${dmy(st!.first!)}', style: const TextStyle(color: Colors.grey)),
+              Text(st?.first == null ? tr('Pas encore de visite enregistrée', 'لا زيارات مسجلة') : '${tr('Client depuis le', 'زبون منذ')} ${dmy(st!.first!)}', style: const TextStyle(color: kMuted)),
             ]),
           ),
         ]),
         const SizedBox(height: 16),
-        ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (pts / store.threshold).clamp(0.0, 1.0), minHeight: 10)),
+        StampRow(progress: (pts / store.threshold).clamp(0.0, 1.0)),
         const SizedBox(height: 6),
         Text('$pts / ${store.threshold} ${tr('points pour la récompense', 'نقطة للمكافأة')}'),
         if (ready)
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: FilledButton.icon(
-              icon: const Icon(Icons.card_giftcard_rounded),
+              icon: const NIcon(NI.gift, size: 20),
               label: Text(tr('Valider la récompense', 'تأكيد المكافأة')),
               onPressed: () async {
                 final m = ScaffoldMessenger.of(context);
@@ -244,22 +245,22 @@ class ClientSheet extends StatelessWidget {
           crossAxisSpacing: 8,
           childAspectRatio: 1.25,
           children: [
-            _kpi(context, Icons.repeat_rounded, '${st?.visits ?? 0}', tr('Visites (6 mois)', 'الزيارات (6 أشهر)')),
-            _kpi(context, Icons.schedule_rounded, since(client['last_scan_at'] as String?), tr('Dernière visite', 'آخر زيارة')),
-            _kpi(context, Icons.event_repeat_rounded, st?.everyDays == null ? '—' : tr('tous les ${st!.everyDays!.round()} j', 'كل ${st!.everyDays!.round()} يوم'), tr('Fréquence', 'التكرار')),
-            _kpi(context, Icons.payments_rounded, st == null || st.amounts == 0 ? '—' : fmtMoney(st.spent), tr('Dépenses', 'المشتريات')),
-            _kpi(context, Icons.shopping_basket_rounded, st?.basket == null ? '—' : fmtMoney(st!.basket!), tr('Panier moyen', 'متوسط السلة')),
-            _kpi(context, Icons.stars_rounded, '$pts', tr('Points', 'النقاط')),
+            _kpi(context, NI.repeat, '${st?.visits ?? 0}', tr('Visites (6 mois)', 'الزيارات (6 أشهر)')),
+            _kpi(context, NI.clock, since(client['last_scan_at'] as String?), tr('Dernière visite', 'آخر زيارة')),
+            _kpi(context, NI.calendar, st?.everyDays == null ? '—' : tr('tous les ${st!.everyDays!.round()} j', 'كل ${st!.everyDays!.round()} يوم'), tr('Fréquence', 'التكرار')),
+            _kpi(context, NI.money, st == null || st.amounts == 0 ? '—' : fmtMoney(st.spent), tr('Dépenses', 'المشتريات')),
+            _kpi(context, NI.basket, st?.basket == null ? '—' : fmtMoney(st!.basket!), tr('Panier moyen', 'متوسط السلة')),
+            _kpi(context, NI.points, '$pts', tr('Points', 'النقاط')),
           ],
         ),
         const SizedBox(height: 20),
         Text(tr('Historique des visites', 'سجل الزيارات'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-        if (scans.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Text(tr('Aucune visite', 'لا زيارات'), style: const TextStyle(color: Colors.grey))),
+        if (scans.isEmpty) Padding(padding: const EdgeInsets.all(16), child: Text(tr('Aucune visite', 'لا زيارات'), style: const TextStyle(color: kMuted))),
         for (final s in scans)
           ListTile(
             dense: true,
             contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.check_circle_outline_rounded, color: Colors.green),
+            leading: const Icon(Icons.check_circle_outline_rounded, color: kOk),
             title: Text('${dmy(localDt(s['created_at']))} · ${hm(s['created_at'] as String?)}'),
             subtitle: amountOf(s) == null ? null : Text(fmtMoney(amountOf(s)!)),
             trailing: Text('+${s['points']}', style: const TextStyle(fontWeight: FontWeight.bold)),
