@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'icons.dart';
 
 class BarData {
   final String label;
@@ -27,7 +28,7 @@ class BarChartCard extends StatelessWidget {
     String f(double v) => fmt != null ? fmt!(v) : v.round().toString();
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
@@ -35,7 +36,7 @@ class BarChartCard extends StatelessWidget {
         ]),
         const SizedBox(height: 14),
         if (empty)
-          SizedBox(height: height, child: Center(child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: Colors.grey))))
+          SizedBox(height: height, child: Center(child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: kMuted))))
         else
           SizedBox(
             height: height + 38,
@@ -58,7 +59,7 @@ class BarChartCard extends StatelessWidget {
                         height: h,
                         margin: EdgeInsets.symmetric(horizontal: data.length > 20 ? 1 : 3),
                         decoration: BoxDecoration(
-                          color: data[i].value == maxV ? brandDark : brandLight,
+                          color: data[i].value == maxV ? cs.onSurface : kAccent,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
                         ),
                       ),
@@ -67,7 +68,7 @@ class BarChartCard extends StatelessWidget {
                     SizedBox(
                       height: 16,
                       child: i % labelEvery == 0
-                          ? OverflowBox(maxWidth: 52, child: Text(data[i].label, softWrap: false, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: Colors.grey)))
+                          ? OverflowBox(maxWidth: 52, child: Text(data[i].label, softWrap: false, textAlign: TextAlign.center, style: const TextStyle(fontSize: 10, color: kMuted)))
                           : null,
                     ),
                   ]),
@@ -82,7 +83,7 @@ class BarChartCard extends StatelessWidget {
 
 /// Carte d'un indicateur : valeur, libellé et évolution par rapport à la période précédente.
 class KpiCard extends StatelessWidget {
-  final IconData icon;
+  final Object icon;
   final String value, label;
   final double? delta; // en %, null = pas de comparaison
   final String? hint;
@@ -93,10 +94,10 @@ class KpiCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(18)),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Row(children: [
-          Icon(icon, color: brandLight, size: 20),
+          ic(icon, size: 22),
           const Spacer(),
           if (delta != null) _Delta(delta!),
         ]),
@@ -113,7 +114,7 @@ class _Delta extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final up = v >= 0;
-    final c = v.abs() < 0.5 ? Colors.grey : (up ? Colors.green : Colors.red);
+    final c = v.abs() < 0.5 ? kMuted : (up ? kOk : kDanger);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(color: c.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
@@ -129,7 +130,7 @@ class SegmentBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = parts.fold<int>(0, (a, p) => a + p.$2);
-    if (total == 0) return Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: Colors.grey));
+    if (total == 0) return Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: kMuted));
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       ClipRRect(
         borderRadius: BorderRadius.circular(8),
