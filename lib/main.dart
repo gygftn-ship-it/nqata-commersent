@@ -364,12 +364,12 @@ class NqataPro extends StatelessWidget {
     final card = dark ? const Color(0xFF1A1A18) : Colors.white;
     final bg = dark ? const Color(0xFF0F0F0E) : kPaper;
     final hair = dark ? const Color(0xFF2E2D29) : kLine;
-    final soft = dark ? const Color(0xFF3A3320) : kAccentSoft;
+    final soft = dark ? const Color(0xFF2A2A27) : const Color(0xFFEBEAE4);
     final scheme = ColorScheme(
       brightness: b,
-      primary: dark ? kAccent : kInk,
+      primary: dark ? const Color(0xFFF3F2ED) : kInk,
       onPrimary: dark ? kInk : Colors.white,
-      secondary: dark ? kAccent : kInk,
+      secondary: dark ? const Color(0xFFF3F2ED) : kInk,
       onSecondary: dark ? kInk : Colors.white,
       primaryContainer: soft,
       onPrimaryContainer: fg,
@@ -500,15 +500,9 @@ class _LoginPageState extends State<LoginPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const AwningStripe(height: 10),
-                  const SizedBox(height: 28),
-                  Row(children: [
-                    Container(width: 44, height: 44, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(12)), child: const Center(child: NIcon(NI.shop, size: 26, color: kInk, accent: Colors.white))),
-                    const SizedBox(width: 12),
-                    const Text('Nqata Pro', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
-                  ]),
-                  const SizedBox(height: 28),
-                  Text(tr('Espace commerçant', 'فضاء التاجر'), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                  const Text('NQATA PRO', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 3)),
+                  const SizedBox(height: 40),
+                  Text(tr('Espace commerçant', 'فضاء التاجر'), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 20),
                   if (signup) _f(name, tr('Votre prénom', 'اسمك')),
                   _f(email, 'E-mail', type: TextInputType.emailAddress),
