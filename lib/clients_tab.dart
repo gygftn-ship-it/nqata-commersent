@@ -152,7 +152,7 @@ class _ClientsTabState extends State<ClientsTab> {
     final ready = pts >= store.threshold;
     return ListTile(
       onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => ClientSheet(client: c)),
-      leading: CircleAvatar(backgroundColor: ready ? kAccent : kAccentSoft, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontWeight: FontWeight.bold, color: kInk))),
+      leading: CircleAvatar(backgroundColor: ready ? kAccent : Theme.of(context).colorScheme.secondaryContainer, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: ready ? kInk : null))),
       title: Text(name),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('$pts ${tr('pts', 'نقطة')} · ${st?.visits ?? 0} ${tr('visites', 'زيارة')} · ${since(c['last_scan_at'] as String?)}'),
@@ -183,7 +183,7 @@ class ClientSheet extends StatelessWidget {
 
   Widget _kpi(BuildContext context, Object i, String v, String l) => Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           ic(i, size: 20),
           FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
@@ -204,7 +204,7 @@ class ClientSheet extends StatelessWidget {
       constraints: BoxConstraints(maxHeight: h * 0.85),
       child: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 24), shrinkWrap: true, children: [
         Row(children: [
-          CircleAvatar(radius: 28, backgroundColor: kAccent, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: kInk))),
+          CircleAvatar(radius: 28, backgroundColor: Theme.of(context).colorScheme.secondaryContainer, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -214,7 +214,7 @@ class ClientSheet extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 16),
-        StampRow(progress: (pts / store.threshold).clamp(0.0, 1.0)),
+        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (pts / store.threshold).clamp(0.0, 1.0), minHeight: 6)),
         const SizedBox(height: 6),
         Text('$pts / ${store.threshold} ${tr('points pour la récompense', 'نقطة للمكافأة')}'),
         if (ready)
