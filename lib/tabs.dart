@@ -49,12 +49,12 @@ class SectionCard extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(top: 14),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          Container(width: 34, height: 34, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(10)), child: Center(child: ic(icon, size: 20, color: kInk, accent: Colors.white))),
+          ic(icon, size: 22),
           const SizedBox(width: 10),
-          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600))),
           if (trailing != null) trailing!,
         ]),
         const SizedBox(height: 12),
@@ -161,7 +161,6 @@ class _ShellState extends State<Shell> {
     return Scaffold(
       body: SafeArea(
         child: Column(children: [
-          const AwningStripe(),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 250),
@@ -203,7 +202,7 @@ class _NavBar extends StatelessWidget {
                   button: true,
                   selected: i == index,
                   child: Stack(alignment: Alignment.topCenter, children: [
-                    if (i == index) Container(width: 28, height: 4, color: kAccent),
+                    if (i == index) Container(width: 24, height: 3, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2))),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
