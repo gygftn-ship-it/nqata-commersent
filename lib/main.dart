@@ -3,12 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
+import 'icons.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
 const supabaseKey = 'sb_publishable_-zL5W-Pf5WMHAZZCONw4_g_RNbjhE5g';
-const brandDark = Color(0xFF0B5F50);
-const brandLight = Color(0xFF14B8A6);
+// ---- Identité visuelle : le ticket de caisse (encre, papier, jaune surligneur) ----
+const kInk = Color(0xFF131312);
+const kPaper = Color(0xFFF4F4F0);
+const kAccent = Color(0xFFFFC800);
+const kAccentSoft = Color(0xFFFFF1B8);
+const kLine = Color(0xFFD8D7CF);
+const kMuted = Color(0xFF727068);
+const kNeutral = Color(0xFFB8B6AE);
+const kOk = Color(0xFF1F8A52);
+const kDanger = Color(0xFFD32F2F);
+const kWarn = Color(0xFFA56A00);
+const brandDark = kInk;
+const brandLight = kAccent;
 
 const shopCats = [('cafe', 'Café', 'مقهى'), ('food', 'Alimentation', 'مواد غذائية'), ('health', 'Santé', 'صحة'), ('beauty', 'Beauté', 'تجميل'), ('other', 'Autres', 'أخرى')];
 
@@ -337,7 +349,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final prefs = await SharedPreferences.getInstance();
   lang = prefs.getString('lang') ?? 'fr';
-  store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.system };
+  store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
   if (Supabase.instance.client.auth.currentSession != null) store.start();
   runApp(const NqataPro());
@@ -346,11 +358,83 @@ Future<void> main() async {
 class NqataPro extends StatelessWidget {
   const NqataPro({super.key});
 
-  ThemeData _theme(Brightness b) => ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0E7C66), brightness: b),
-        navigationBarTheme: const NavigationBarThemeData(height: 68, indicatorShape: StadiumBorder()),
-      );
+  ThemeData _theme(Brightness b) {
+    final dark = b == Brightness.dark;
+    final fg = dark ? const Color(0xFFF3F2ED) : kInk;
+    final card = dark ? const Color(0xFF1A1A18) : Colors.white;
+    final bg = dark ? const Color(0xFF0F0F0E) : kPaper;
+    final hair = dark ? const Color(0xFF2E2D29) : kLine;
+    final soft = dark ? const Color(0xFF3A3320) : kAccentSoft;
+    final scheme = ColorScheme(
+      brightness: b,
+      primary: dark ? kAccent : kInk,
+      onPrimary: dark ? kInk : Colors.white,
+      secondary: dark ? kAccent : kInk,
+      onSecondary: dark ? kInk : Colors.white,
+      primaryContainer: soft,
+      onPrimaryContainer: fg,
+      secondaryContainer: soft,
+      onSecondaryContainer: fg,
+      error: dark ? const Color(0xFFFF6B6B) : kDanger,
+      onError: dark ? kInk : Colors.white,
+      surface: card,
+      onSurface: fg,
+      onSurfaceVariant: dark ? const Color(0xFFA9A89F) : const Color(0xFF5E5D57),
+      surfaceTint: Colors.transparent,
+      surfaceContainerLowest: bg,
+      surfaceContainerLow: card,
+      surfaceContainer: card,
+      surfaceContainerHigh: card,
+      surfaceContainerHighest: card,
+      outline: dark ? const Color(0xFF55544D) : const Color(0xFFC9C7BD),
+      outlineVariant: hair,
+    );
+    OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c, width: w));
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: bg,
+      dividerColor: hair,
+      appBarTheme: AppBarTheme(backgroundColor: bg, foregroundColor: fg, elevation: 0, scrolledUnderElevation: 0, surfaceTintColor: Colors.transparent, titleTextStyle: TextStyle(color: fg, fontSize: 20, fontWeight: FontWeight.w700)),
+      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(64, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(64, 48), side: BorderSide(color: scheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: card,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        border: ob(scheme.outline),
+        enabledBorder: ob(scheme.outline),
+        focusedBorder: ob(fg, 1.6),
+        errorBorder: ob(scheme.error),
+        focusedErrorBorder: ob(scheme.error, 1.6),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: card,
+        selectedColor: soft,
+        side: BorderSide(color: scheme.outline),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        labelStyle: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13),
+        checkmarkColor: fg,
+      ),
+      segmentedButtonTheme: SegmentedButtonThemeData(
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? soft : card),
+          foregroundColor: WidgetStatePropertyAll(fg),
+          side: WidgetStatePropertyAll(BorderSide(color: scheme.outline)),
+          shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24)))),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: dark ? const Color(0xFFF3F2ED) : kInk,
+        contentTextStyle: TextStyle(color: dark ? kInk : Colors.white),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      popupMenuTheme: PopupMenuThemeData(color: card, surfaceTintColor: Colors.transparent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: scheme.primary, linearTrackColor: dark ? const Color(0xFF2E2D29) : const Color(0xFFE6E4DC)),
+    );
+  }
 
   Widget _home() {
     if (!store.loggedIn) return const LoginPage();
@@ -409,39 +493,38 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: Container(
-          decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [brandDark, brandLight])),
+        body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
-              child: Theme(
-                data: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0E7C66))),
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(28)),
-                  child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    const Text('NQATA PRO', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, letterSpacing: 3, color: brandDark)),
-                    Text(tr('Espace commerçant', 'فضاء التاجر'), style: const TextStyle(color: Colors.black54)),
-                    const SizedBox(height: 16),
-                    if (signup) _f(name, tr('Votre prénom', 'اسمك')),
-                    _f(email, 'E-mail', type: TextInputType.emailAddress),
-                    _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
-                    if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: busy ? null : _submit,
-                        child: busy
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => setState(() { signup = !signup; error = null; }),
-                      child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
-                    ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  const AwningStripe(height: 10),
+                  const SizedBox(height: 28),
+                  Row(children: [
+                    Container(width: 44, height: 44, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(12)), child: const Center(child: NIcon(NI.shop, size: 26, color: kInk, accent: Colors.white))),
+                    const SizedBox(width: 12),
+                    const Text('Nqata Pro', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
                   ]),
-                ),
+                  const SizedBox(height: 28),
+                  Text(tr('Espace commerçant', 'فضاء التاجر'), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 20),
+                  if (signup) _f(name, tr('Votre prénom', 'اسمك')),
+                  _f(email, 'E-mail', type: TextInputType.emailAddress),
+                  _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
+                  if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
+                  FilledButton(
+                    onPressed: busy ? null : _submit,
+                    child: busy
+                        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
+                        : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
+                  ),
+                  TextButton(
+                    onPressed: () => setState(() { signup = !signup; error = null; }),
+                    child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
+                  ),
+                ]),
               ),
             ),
           ),
@@ -494,10 +577,10 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
           const SizedBox(height: 12),
           _f(address, tr('Adresse', 'العنوان')),
           _f(phone, tr('Téléphone', 'الهاتف')),
-          if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: Colors.red))),
+          if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
           FilledButton(onPressed: busy ? null : _go, child: Text(tr('Envoyer ma demande', 'إرسال الطلب'))),
           const SizedBox(height: 8),
-          Text(tr('Vous faites partie de l\'équipe d\'un commerce ? Donnez votre code au propriétaire : ${store.myCode}', 'أنت ضمن فريق متجر؟ أعطِ رمزك للمالك: ${store.myCode}'), style: const TextStyle(color: Colors.grey)),
+          Text(tr('Vous faites partie de l\'équipe d\'un commerce ? Donnez votre code au propriétaire : ${store.myCode}', 'أنت ضمن فريق متجر؟ أعطِ رمزك للمالك: ${store.myCode}'), style: const TextStyle(color: kMuted)),
           TextButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
         ]),
       );
@@ -517,7 +600,7 @@ class InfoPage extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(pending ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded, size: 72, color: pending ? Colors.orange : Colors.grey),
+            Icon(pending ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded, size: 72, color: pending ? kWarn : kMuted),
             const SizedBox(height: 16),
             Text(
               pending ? tr('Commerce en attente de validation', 'المتجر بانتظار الموافقة') : (store.loadError ?? ''),
@@ -525,7 +608,7 @@ class InfoPage extends StatelessWidget {
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
-            if (pending) Text('${store.shop?['name'] ?? ''}', style: const TextStyle(color: Colors.grey)),
+            if (pending) Text('${store.shop?['name'] ?? ''}', style: const TextStyle(color: kMuted)),
             const SizedBox(height: 16),
             FilledButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
           ]),
