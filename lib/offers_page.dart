@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 
 /// Page des offres, ouverte depuis l'onglet Commerce (propriétaire et gérants).
 class OffersPage extends StatefulWidget {
@@ -76,7 +77,7 @@ class _OffersPageState extends State<OffersPage> {
               for (final o in store.offers)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.local_offer_rounded, color: brandLight),
+                  leading: const NIcon(NI.offer),
                   title: Text('${o['title']}'),
                   subtitle: Text('${audiences.firstWhere((a) => a.$1 == o['audience'], orElse: () => audiences[0]).$2} · ${since(o['created_at'] as String?)}${until(o['expires_at'] as String?)}'),
                   trailing: IconButton(
