@@ -6,6 +6,7 @@ import 'clients_tab.dart';
 import 'shop_tab.dart';
 import 'stats_tab.dart';
 import 'profile_tab.dart';
+import 'icons.dart';
 
 // ---------- Utilitaires partagés ----------
 class FadeSlideIn extends StatelessWidget {
@@ -38,26 +39,29 @@ class AnimatedCount extends StatelessWidget {
 /// Carte avec titre et icône, utilisée dans les onglets Commerce et Profil.
 class SectionCard extends StatelessWidget {
   final String title;
-  final IconData icon;
+  final Object icon; // NI (icône Nqata) ou IconData
   final List<Widget> children;
   final Widget? trailing;
   const SectionCard({super.key, required this.title, required this.icon, required this.children, this.trailing});
   @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.only(top: 14),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            Icon(icon, color: brandLight, size: 22),
-            const SizedBox(width: 8),
-            Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
-            if (trailing != null) trailing!,
-          ]),
-          const SizedBox(height: 12),
-          ...children,
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(width: 34, height: 34, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(10)), child: Center(child: ic(icon, size: 20, color: kInk, accent: Colors.white))),
+          const SizedBox(width: 10),
+          Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700))),
+          if (trailing != null) trailing!,
         ]),
-      );
+        const SizedBox(height: 12),
+        ...children,
+      ]),
+    );
+  }
 }
 
 /// Bandeau rouge qui montre la vraie erreur de lecture (au lieu d'une liste vide).
@@ -69,9 +73,9 @@ class ErrorBanner extends StatelessWidget {
         width: double.infinity,
         margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Colors.red.withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: Colors.red.withOpacity(0.4))),
+        decoration: BoxDecoration(color: kDanger.withOpacity(0.12), borderRadius: BorderRadius.circular(14), border: Border.all(color: kDanger.withOpacity(0.4))),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('${tr('Lecture impossible', 'تعذّرت القراءة')} : $what', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
+          Text('${tr('Lecture impossible', 'تعذّرت القراءة')} : $what', style: const TextStyle(fontWeight: FontWeight.bold, color: kDanger)),
           const SizedBox(height: 4),
           SelectableText(message, style: const TextStyle(fontSize: 12)),
           Align(alignment: AlignmentDirectional.centerEnd, child: TextButton(onPressed: store.refresh, child: Text(tr('Réessayer', 'إعادة المحاولة')))),
@@ -146,26 +150,73 @@ class _ShellState extends State<Shell> {
   @override
   Widget build(BuildContext context) {
     // Les statistiques (chiffre d'affaires, etc.) sont réservées au propriétaire et aux gérants.
-    final items = <(Widget, IconData, String)>[
-      (const ScannerTab(), Icons.qr_code_scanner_rounded, tr('Scanner', 'مسح')),
-      (const ClientsTab(), Icons.groups_rounded, tr('Clients', 'الزبائن')),
-      (const ShopTab(), Icons.storefront_rounded, tr('Commerce', 'المتجر')),
-      if (store.manager) (const StatsTab(), Icons.insights_rounded, tr('Stats', 'الإحصاءات')),
-      (const ProfileTab(), Icons.person_rounded, tr('Profil', 'الحساب')),
+    final items = <(Widget, NI, String)>[
+      (const ScannerTab(), NI.scan, tr('Scanner', 'مسح')),
+      (const ClientsTab(), NI.clients, tr('Clients', 'الزبائن')),
+      (const ShopTab(), NI.shop, tr('Commerce', 'المتجر')),
+      if (store.manager) (const StatsTab(), NI.stats, tr('Stats', 'الإحصاءات')),
+      (const ProfileTab(), NI.profile, tr('Profil', 'الحساب')),
     ];
     if (tab >= items.length) tab = items.length - 1;
     return Scaffold(
       body: SafeArea(
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
-          transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
-          child: KeyedSubtree(key: ValueKey('${items[tab].$3}'), child: items[tab].$1),
-        ),
+        child: Column(children: [
+          const AwningStripe(),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 250),
+              transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
+              child: KeyedSubtree(key: ValueKey('${items[tab].$3}'), child: items[tab].$1),
+            ),
+          ),
+        ]),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab,
-        onDestinationSelected: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
-        destinations: [for (final it in items) NavigationDestination(icon: Icon(it.$2), label: it.$3)],
+      bottomNavigationBar: _NavBar(
+        index: tab,
+        items: [for (final it in items) (it.$2, it.$3)],
+        onTap: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
+      ),
+    );
+  }
+}
+
+/// Barre du bas : icônes Nqata, trait jaune sous le store de l'onglet actif.
+class _NavBar extends StatelessWidget {
+  final int index;
+  final List<(NI, String)> items;
+  final ValueChanged<int> onTap;
+  const _NavBar({required this.index, required this.items, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(color: cs.surface, border: Border(top: BorderSide(color: cs.outlineVariant))),
+      child: SafeArea(
+        top: false,
+        child: Row(children: [
+          for (var i = 0; i < items.length; i++)
+            Expanded(
+              child: InkResponse(
+                onTap: () => onTap(i),
+                child: Semantics(
+                  button: true,
+                  selected: i == index,
+                  child: Stack(alignment: Alignment.topCenter, children: [
+                    if (i == index) Container(width: 28, height: 4, color: kAccent),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+                      child: Column(mainAxisSize: MainAxisSize.min, children: [
+                        NIcon(items[i].$1, size: 24, color: i == index ? cs.onSurface : cs.onSurfaceVariant),
+                        const SizedBox(height: 4),
+                        Text(items[i].$2, style: TextStyle(fontSize: 11.5, fontWeight: i == index ? FontWeight.w700 : FontWeight.w500, color: i == index ? cs.onSurface : cs.onSurfaceVariant)),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
+        ]),
       ),
     );
   }
