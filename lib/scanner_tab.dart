@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 
 class ScanFrame extends StatefulWidget {
   const ScanFrame({super.key});
@@ -20,10 +21,11 @@ class _ScanFrameState extends State<ScanFrame> with SingleTickerProviderStateMix
   Widget build(BuildContext context) => IgnorePointer(
         child: Center(
           child: SizedBox(
-            width: 230,
-            height: 230,
+            width: 240,
+            height: 240,
             child: Stack(children: [
-              Container(decoration: BoxDecoration(border: Border.all(color: Colors.white, width: 3), borderRadius: BorderRadius.circular(24))),
+              for (final a in const [Alignment.topLeft, Alignment.topRight, Alignment.bottomLeft, Alignment.bottomRight])
+                Align(alignment: a, child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _CornerPainter(a)))),
               AnimatedBuilder(
                 animation: c,
                 builder: (_, __) => Align(
@@ -31,7 +33,7 @@ class _ScanFrameState extends State<ScanFrame> with SingleTickerProviderStateMix
                   child: Container(
                     height: 3,
                     margin: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(color: Colors.greenAccent, borderRadius: BorderRadius.circular(2), boxShadow: const [BoxShadow(color: Colors.greenAccent, blurRadius: 8)]),
+                    decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2), boxShadow: const [BoxShadow(color: kAccent, blurRadius: 8)]),
                   ),
                 ),
               ),
@@ -39,6 +41,30 @@ class _ScanFrameState extends State<ScanFrame> with SingleTickerProviderStateMix
           ),
         ),
       );
+}
+
+/// Coin jaune du cadre de scan (repère du logo).
+class _CornerPainter extends CustomPainter {
+  final Alignment a;
+  _CornerPainter(this.a);
+  @override
+  bool shouldRepaint(_CornerPainter o) => false;
+  @override
+  void paint(Canvas c, Size s) {
+    final p = Paint()
+      ..color = kAccent
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4
+      ..strokeCap = StrokeCap.round;
+    final dx = a.x < 0 ? 1.0 : -1.0, dy = a.y < 0 ? 1.0 : -1.0;
+    final ox = a.x < 0 ? 2.0 : s.width - 2, oy = a.y < 0 ? 2.0 : s.height - 2;
+    final path = Path()
+      ..moveTo(ox + dx * 36, oy)
+      ..lineTo(ox + dx * 14, oy)
+      ..quadraticBezierTo(ox, oy, ox, oy + dy * 14)
+      ..lineTo(ox, oy + dy * 36);
+    c.drawPath(path, p);
+  }
 }
 
 /// Saisie ou modification du montant d'un achat (sert au panier moyen).
@@ -101,7 +127,7 @@ class _ScannerTabState extends State<ScannerTab> {
       context: context,
       builder: (d) {
         Timer(const Duration(milliseconds: 3000), () { if (d.mounted && Navigator.of(d).canPop()) Navigator.of(d).pop(); });
-        return AlertDialog(icon: const Icon(Icons.error_rounded, color: Colors.red, size: 64), content: Text(msg, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)));
+        return AlertDialog(icon: const Icon(Icons.error_rounded, color: kDanger, size: 64), content: Text(msg, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)));
       },
     );
   }
@@ -116,12 +142,12 @@ class _ScannerTabState extends State<ScannerTab> {
     );
   }
 
-  Widget _mini(IconData i, String v, String l) => Expanded(
+  Widget _mini(Object i, String v, String l) => Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(14)),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
           child: Column(children: [
-            Icon(i, size: 18, color: brandLight),
+            ic(i, size: 20),
             Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             Text(l, style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
           ]),
@@ -164,11 +190,11 @@ class _ScannerTabState extends State<ScannerTab> {
                     right: 8,
                     child: Column(children: [
                       IconButton.filled(
-                        icon: Icon(torch ? Icons.flashlight_off_rounded : Icons.flashlight_on_rounded),
+                        icon: NIcon(NI.torch, accent: torch ? kAccent : Colors.transparent),
                         onPressed: () { controller.toggleTorch(); setState(() => torch = !torch); },
                       ),
                       const SizedBox(height: 6),
-                      IconButton.filled(icon: const Icon(Icons.cameraswitch_rounded), onPressed: () => controller.switchCamera()),
+                      IconButton.filled(icon: const NIcon(NI.camera), onPressed: () => controller.switchCamera()),
                     ]),
                   ),
                   Positioned(
@@ -192,11 +218,11 @@ class _ScannerTabState extends State<ScannerTab> {
                 onRefresh: store.refresh,
                 child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: [
                   Row(children: [
-                    _mini(Icons.check_circle_rounded, '${valid.length}', tr('Passages', 'الزيارات')),
+                    _mini(NI.check, '${valid.length}', tr('Passages', 'الزيارات')),
                     const SizedBox(width: 8),
-                    _mini(Icons.stars_rounded, fmtNum(points), tr('Points donnés', 'النقاط')),
+                    _mini(NI.points, fmtNum(points), tr('Points donnés', 'النقاط')),
                     const SizedBox(width: 8),
-                    _mini(Icons.card_giftcard_rounded, '${store.redeems.length}', tr('Récompenses', 'المكافآت')),
+                    _mini(NI.gift, '${store.redeems.length}', tr('Récompenses', 'المكافآت')),
                   ]),
                   const SizedBox(height: 12),
                   Row(children: [
@@ -213,20 +239,20 @@ class _ScannerTabState extends State<ScannerTab> {
                   ]),
                   const SizedBox(height: 14),
                   Text(tr('Derniers scans', 'آخر المسح'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  if (recent.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Center(child: Text(tr('Aucun scan aujourd\'hui', 'لا مسح اليوم'), style: const TextStyle(color: Colors.grey)))),
+                  if (recent.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Center(child: Text(tr('Aucun scan aujourd\'hui', 'لا مسح اليوم'), style: const TextStyle(color: kMuted)))),
                   for (final s in recent)
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       onTap: store.hasAmount && s['undone_at'] == null ? () => showAmountDialog(context, '${s['id']}', amountOf(s)) : null,
-                      leading: CircleAvatar(radius: 16, backgroundColor: s['undone_at'] != null ? Colors.grey : Colors.green, child: Icon(s['undone_at'] != null ? Icons.block : Icons.check, size: 16, color: Colors.white)),
+                      leading: CircleAvatar(radius: 16, backgroundColor: s['undone_at'] != null ? kMuted : kOk, child: Icon(s['undone_at'] != null ? Icons.block : Icons.check, size: 16, color: Colors.white)),
                       title: Text(store.clientName(s['client_id'] as String?)),
                       subtitle: Text('${hm(s['created_at'] as String?)}${s['undone_at'] != null ? ' · ${tr('annulé', 'ملغى')}' : ''}${amountOf(s) != null ? ' · ${fmtMoney(amountOf(s)!)}' : ''}'),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
                         Text('+${s['points']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                         if (canUndoScan(s))
                           IconButton(
-                            icon: const Icon(Icons.undo_rounded),
+                            icon: const NIcon(NI.undo, size: 20),
                             tooltip: tr('Annuler', 'إلغاء'),
                             onPressed: () async {
                               try {
@@ -303,12 +329,19 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.green, size: 56),
+            const AwningStripe(height: 6),
+            const SizedBox(height: 14),
+            NIcon(NI.check, size: 56, color: kOk, accent: kOk.withOpacity(0.15)),
             const SizedBox(height: 6),
             Text('${r['client_name']}', textAlign: TextAlign.center, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            Text('+${r['points_added']} ${tr('points', 'نقطة')}', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: brandDark)),
+            Container(
+              margin: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(8)),
+              child: Text('+${r['points_added']} ${tr('points', 'نقطة')}', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: kInk, fontFeatures: [FontFeature.tabularFigures()])),
+            ),
             const SizedBox(height: 12),
-            ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (bal / thr).clamp(0.0, 1.0), minHeight: 10)),
+            StampRow(progress: (bal / thr).clamp(0.0, 1.0)),
             const SizedBox(height: 6),
             Text('${tr('Solde', 'الرصيد')} : $bal / $thr', style: theme.textTheme.bodyMedium),
             if (ready)
@@ -316,8 +349,8 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
                 width: double.infinity,
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: Colors.amber.shade100, borderRadius: BorderRadius.circular(14)),
-                child: Text('🎁 ${tr('Récompense disponible', 'مكافأة متاحة')}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(14)),
+                child: Text('${tr('Récompense disponible', 'مكافأة متاحة')}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
               ),
             if (store.hasAmount) ...[
               const SizedBox(height: 16),
@@ -338,7 +371,7 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
             const SizedBox(height: 14),
             Row(children: [
               TextButton.icon(
-                icon: const Icon(Icons.undo_rounded),
+                icon: const NIcon(NI.undo, size: 20),
                 label: Text(tr('Annuler le scan', 'إلغاء المسح')),
                 onPressed: busy ? null : () => _run(() => store.undo('${r['scan_id']}'), tr('Scan annulé', 'تم إلغاء المسح')),
               ),
