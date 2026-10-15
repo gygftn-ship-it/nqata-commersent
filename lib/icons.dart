@@ -2,8 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'main.dart';
 
-/// Icônes Nqata : trait arrondi + une touche de jaune, comme les objets
-/// lumineux du logo (store, étiquette %, colis, carte, pin, panier).
+/// Icônes Nqata : traits fins, une seule couleur (celle du texte).
+/// Motifs tirés du logo : store, étiquette, carte, panier.
 enum NI { scan, clients, shop, stats, profile, offer, points, gift, money, basket, repeat, clock, calendar, search, sort, edit, copy, badge, tune, lock, torch, camera, photos, info, undo, check }
 
 class NIcon extends StatelessWidget {
@@ -38,11 +38,11 @@ class _NPainter extends CustomPainter {
     final line = Paint()
       ..color = ink
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
+      ..strokeWidth = 1.5
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final fill = Paint()
-      ..color = accent
+      ..color = Colors.transparent // pas de remplissage : icônes au trait
       ..style = PaintingStyle.fill;
     final solid = Paint()
       ..color = ink
@@ -163,7 +163,7 @@ class _NPainter extends CustomPainter {
         {
           // La carte bancaire du logo
           rr(3, 6, 18, 12, 2.5);
-          fl(Path()..addRect(Rect.fromLTWH(3.8, 9.4, 16.4, 2.8)));
+          ln(3, 10.5, 21, 10.5);
           ln(6.5, 15, 10.5, 15);
         }
       case NI.basket:
@@ -297,54 +297,5 @@ class _NPainter extends CustomPainter {
           st(poly([7.5, 12.5, 10.8, 15.8, 16.8, 9]));
         }
     }
-  }
-}
-
-/// Bande de store jaune et noire (signature visuelle, tirée du logo).
-class AwningStripe extends StatelessWidget {
-  final double height;
-  const AwningStripe({super.key, this.height = 8});
-
-  @override
-  Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return SizedBox(height: height, width: double.infinity, child: CustomPaint(painter: _StripePainter(dark ? const Color(0xFF3A3935) : kInk)));
-  }
-}
-
-class _StripePainter extends CustomPainter {
-  final Color alt;
-  _StripePainter(this.alt);
-  @override
-  bool shouldRepaint(_StripePainter o) => o.alt != alt;
-  @override
-  void paint(Canvas canvas, Size size) {
-    const w = 20.0;
-    var k = 0;
-    for (var x = 0.0; x < size.width; x += w) {
-      canvas.drawRect(Rect.fromLTWH(x, 0, w, size.height), Paint()..color = k.isEven ? kAccent : alt);
-      k++;
-    }
-  }
-}
-
-/// Carte de fidélité : 10 tampons qui se remplissent jusqu'à la récompense.
-class StampRow extends StatelessWidget {
-  final double progress;
-  final int count;
-  const StampRow({super.key, required this.progress, this.count = 10});
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = Theme.of(context).colorScheme.onSurface;
-    final filled = (progress.clamp(0.0, 1.0) * count).floor();
-    return Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-      for (var i = 0; i < count; i++)
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(shape: BoxShape.circle, color: i < filled ? kAccent : Colors.transparent, border: Border.all(color: fg, width: 1.5)),
-        ),
-    ]);
   }
 }
