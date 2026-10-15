@@ -33,7 +33,7 @@ class _ScanFrameState extends State<ScanFrame> with SingleTickerProviderStateMix
                   child: Container(
                     height: 3,
                     margin: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2), boxShadow: const [BoxShadow(color: kAccent, blurRadius: 8)]),
+                    decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
               ),
@@ -52,9 +52,9 @@ class _CornerPainter extends CustomPainter {
   @override
   void paint(Canvas c, Size s) {
     final p = Paint()
-      ..color = kAccent
+      ..color = Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4
+      ..strokeWidth = 3
       ..strokeCap = StrokeCap.round;
     final dx = a.x < 0 ? 1.0 : -1.0, dy = a.y < 0 ? 1.0 : -1.0;
     final ox = a.x < 0 ? 2.0 : s.width - 2, oy = a.y < 0 ? 2.0 : s.height - 2;
@@ -145,7 +145,7 @@ class _ScannerTabState extends State<ScannerTab> {
   Widget _mini(Object i, String v, String l) => Expanded(
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
           child: Column(children: [
             ic(i, size: 20),
             Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
@@ -190,7 +190,7 @@ class _ScannerTabState extends State<ScannerTab> {
                     right: 8,
                     child: Column(children: [
                       IconButton.filled(
-                        icon: NIcon(NI.torch, accent: torch ? kAccent : Colors.transparent),
+                        icon: Icon(torch ? Icons.flashlight_off_rounded : Icons.flashlight_on_rounded),
                         onPressed: () { controller.toggleTorch(); setState(() => torch = !torch); },
                       ),
                       const SizedBox(height: 6),
@@ -329,19 +329,12 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
         padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const AwningStripe(height: 6),
-            const SizedBox(height: 14),
-            NIcon(NI.check, size: 56, color: kOk, accent: kOk.withOpacity(0.15)),
+            const Icon(Icons.check_circle_outline_rounded, color: kOk, size: 48),
             const SizedBox(height: 6),
             Text('${r['client_name']}', textAlign: TextAlign.center, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(8)),
-              child: Text('+${r['points_added']} ${tr('points', 'نقطة')}', style: const TextStyle(fontSize: 30, fontWeight: FontWeight.w800, color: kInk, fontFeatures: [FontFeature.tabularFigures()])),
-            ),
+            Text('+${r['points_added']} ${tr('points', 'نقطة')}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
             const SizedBox(height: 12),
-            StampRow(progress: (bal / thr).clamp(0.0, 1.0)),
+            ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (bal / thr).clamp(0.0, 1.0), minHeight: 6)),
             const SizedBox(height: 6),
             Text('${tr('Solde', 'الرصيد')} : $bal / $thr', style: theme.textTheme.bodyMedium),
             if (ready)
@@ -349,8 +342,8 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
                 width: double.infinity,
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(14)),
-                child: Text('${tr('Récompense disponible', 'مكافأة متاحة')}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
+                child: Text('${tr('Récompense disponible', 'مكافأة متاحة')}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
             if (store.hasAmount) ...[
               const SizedBox(height: 16),
