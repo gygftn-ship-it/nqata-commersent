@@ -228,7 +228,7 @@ class _ShopTabState extends State<ShopTab> {
       ]),
       if (uploading) const Padding(padding: EdgeInsets.only(top: 8), child: LinearProgressIndicator()),
       const SizedBox(height: 44),
-      Text('${shop?['name'] ?? ''}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+      Text('${shop?['name'] ?? ''}', style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
       const SizedBox(height: 6),
       Wrap(spacing: 8, runSpacing: 6, children: [
         _chip(tr(catLabel.$2, catLabel.$3), Theme.of(context).colorScheme.onSurface),
@@ -333,9 +333,9 @@ class _ShopTabState extends State<ShopTab> {
                     padding: const EdgeInsets.only(top: 14),
                     child: Material(
                       color: theme.colorScheme.surfaceContainerHighest,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: theme.colorScheme.outlineVariant)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: theme.colorScheme.outlineVariant)),
                       child: ListTile(
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         leading: const NIcon(NI.offer),
                         title: Text(tr('Offres et promotions', 'العروض والترويج'), style: const TextStyle(fontWeight: FontWeight.w700)),
                         subtitle: Text('$activeOffers ${tr('offre(s) en cours', 'عرض ساري')}'),
