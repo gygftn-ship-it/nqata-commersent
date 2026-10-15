@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 import 'charts.dart';
 
 class _Agg {
@@ -138,7 +139,7 @@ class _StatsTabState extends State<StatsTab> {
               FadeSlideIn(
                 child: Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), gradient: const LinearGradient(colors: [brandDark, brandLight])),
+                  decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tr('Aujourd\'hui', 'اليوم'), style: const TextStyle(color: Colors.white70)),
                     const SizedBox(height: 8),
@@ -150,7 +151,7 @@ class _StatsTabState extends State<StatsTab> {
                         if (store.hasAmount) (fmtNum(todayMoney), 'DA'),
                       ])
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800))),
+                          FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: const TextStyle(color: kAccent, fontSize: 22, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))),
                           Text(e.$2, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         ])),
                     ]),
@@ -168,7 +169,7 @@ class _StatsTabState extends State<StatsTab> {
                 onSelectionChanged: (s) => setState(() => days = s.first),
               ),
               const SizedBox(height: 6),
-              Text(tr('Évolution par rapport aux ${days} jours précédents', 'التغير مقارنة بالـ $days يومًا السابقة'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(tr('Évolution par rapport aux ${days} jours précédents', 'التغير مقارنة بالـ $days يومًا السابقة'), style: const TextStyle(fontSize: 12, color: kMuted)),
               const SizedBox(height: 12),
               GridView.count(
                 crossAxisCount: 2,
@@ -178,25 +179,25 @@ class _StatsTabState extends State<StatsTab> {
                 crossAxisSpacing: 10,
                 childAspectRatio: 1.55,
                 children: [
-                  KpiCard(icon: Icons.check_circle_rounded, value: fmtNum(cur.visits), label: tr('Passages', 'الزيارات'), delta: _delta(cur.visits, prev.visits)),
-                  KpiCard(icon: Icons.person_rounded, value: fmtNum(cur.clients.length), label: tr('Clients différents', 'زبائن مختلفون'), delta: _delta(cur.clients.length, prev.clients.length)),
-                  KpiCard(icon: Icons.shopping_basket_rounded, value: cur.basket == null ? '—' : fmtMoney(cur.basket!), label: tr('Panier moyen', 'متوسط السلة'), delta: cur.basket == null || prev.basket == null ? null : _delta(cur.basket!, prev.basket!)),
-                  KpiCard(icon: Icons.payments_rounded, value: hasMoney ? fmtMoney(cur.revenue) : '—', label: tr('Chiffre d\'affaires', 'رقم المعاملات'), delta: hasMoney ? _delta(cur.revenue, prev.revenue) : null),
-                  KpiCard(icon: Icons.replay_rounded, value: '${cur.returnRate.round()}%', label: tr('Taux de retour', 'نسبة العودة'), delta: prev.clients.isEmpty ? null : _delta(cur.returnRate, prev.returnRate)),
-                  KpiCard(icon: Icons.groups_rounded, value: cur.clients.isEmpty ? '—' : (cur.visits / cur.clients.length).toStringAsFixed(1), label: tr('Visites par client', 'زيارات لكل زبون')),
-                  KpiCard(icon: Icons.stars_rounded, value: fmtNum(cur.points), label: tr('Points distribués', 'النقاط الممنوحة'), delta: _delta(cur.points, prev.points)),
-                  KpiCard(icon: Icons.card_giftcard_rounded, value: '$rewards', label: tr('Récompenses', 'المكافآت'), delta: _delta(rewards, prevRewards)),
+                  KpiCard(icon: NI.check, value: fmtNum(cur.visits), label: tr('Passages', 'الزيارات'), delta: _delta(cur.visits, prev.visits)),
+                  KpiCard(icon: NI.profile, value: fmtNum(cur.clients.length), label: tr('Clients différents', 'زبائن مختلفون'), delta: _delta(cur.clients.length, prev.clients.length)),
+                  KpiCard(icon: NI.basket, value: cur.basket == null ? '—' : fmtMoney(cur.basket!), label: tr('Panier moyen', 'متوسط السلة'), delta: cur.basket == null || prev.basket == null ? null : _delta(cur.basket!, prev.basket!)),
+                  KpiCard(icon: NI.money, value: hasMoney ? fmtMoney(cur.revenue) : '—', label: tr('Chiffre d\'affaires', 'رقم المعاملات'), delta: hasMoney ? _delta(cur.revenue, prev.revenue) : null),
+                  KpiCard(icon: NI.repeat, value: '${cur.returnRate.round()}%', label: tr('Taux de retour', 'نسبة العودة'), delta: prev.clients.isEmpty ? null : _delta(cur.returnRate, prev.returnRate)),
+                  KpiCard(icon: NI.clients, value: cur.clients.isEmpty ? '—' : (cur.visits / cur.clients.length).toStringAsFixed(1), label: tr('Visites par client', 'زيارات لكل زبون')),
+                  KpiCard(icon: NI.points, value: fmtNum(cur.points), label: tr('Points distribués', 'النقاط الممنوحة'), delta: _delta(cur.points, prev.points)),
+                  KpiCard(icon: NI.gift, value: '$rewards', label: tr('Récompenses', 'المكافآت'), delta: _delta(rewards, prevRewards)),
                 ],
               ),
               if (!store.hasAmount)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
-                  child: Text(tr('Panier moyen et chiffre d\'affaires indisponibles : ajoutez la colonne « montant » à la base (voir supabase_update.sql).', 'متوسط السلة ورقم المعاملات غير متاحين: أضف عمود «المبلغ» إلى قاعدة البيانات (انظر supabase_update.sql).'), style: const TextStyle(fontSize: 12, color: Colors.orange)),
+                  child: Text(tr('Panier moyen et chiffre d\'affaires indisponibles : ajoutez la colonne « montant » à la base (voir supabase_update.sql).', 'متوسط السلة ورقم المعاملات غير متاحين: أضف عمود «المبلغ» إلى قاعدة البيانات (انظر supabase_update.sql).'), style: const TextStyle(fontSize: 12, color: kWarn)),
                 )
               else if (cur.amounts == 0)
                 Padding(
                   padding: const EdgeInsets.only(top: 10),
-                  child: Text(tr('Saisissez le montant de l\'achat après chaque scan pour voir le panier moyen et le chiffre d\'affaires.', 'أدخل مبلغ الشراء بعد كل مسح لتظهر السلة المتوسطة ورقم المعاملات.'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  child: Text(tr('Saisissez le montant de l\'achat après chaque scan pour voir le panier moyen et le chiffre d\'affaires.', 'أدخل مبلغ الشراء بعد كل مسح لتظهر السلة المتوسطة ورقم المعاملات.'), style: const TextStyle(fontSize: 12, color: kMuted)),
                 ),
               const SizedBox(height: 16),
               FadeSlideIn(
@@ -240,29 +241,29 @@ class _StatsTabState extends State<StatsTab> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Fidélité des clients', 'ولاء الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
                   SegmentBar(parts: [
-                    (tr('1 visite', 'زيارة واحدة'), once, Colors.blueGrey),
-                    (tr('2 visites', 'زيارتان'), twice, brandLight),
-                    (tr('3 visites et +', '3 زيارات فأكثر'), often, brandDark),
+                    (tr('1 visite', 'زيارة واحدة'), once, kNeutral),
+                    (tr('2 visites', 'زيارتان'), twice, kAccent),
+                    (tr('3 visites et +', '3 زيارات فأكثر'), often, theme.colorScheme.onSurface),
                   ]),
                 ]),
               ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Meilleurs clients', 'أفضل الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  if (top.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: Colors.grey))),
+                  if (top.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: kMuted))),
                   for (var i = 0; i < top.length && i < 5; i++)
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(radius: 14, backgroundColor: i == 0 ? Colors.amber : brandLight.withOpacity(0.25), child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13))),
+                      leading: CircleAvatar(radius: 14, backgroundColor: i == 0 ? kAccent : kAccentSoft, child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kInk))),
                       title: Text(store.clientName(top[i].key)),
                       subtitle: cur.spentBy[top[i].key] == null ? null : Text(fmtMoney(cur.spentBy[top[i].key]!)),
                       trailing: Text('${top[i].value} ${tr('visites', 'زيارة')}', style: const TextStyle(fontWeight: FontWeight.bold)),
