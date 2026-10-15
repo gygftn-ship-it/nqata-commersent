@@ -95,9 +95,9 @@ class ProfileTab extends StatelessWidget {
             FadeSlideIn(
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Row(children: [
-                  CircleAvatar(radius: 32, backgroundColor: kAccent, child: Text(name[0].toUpperCase(), style: const TextStyle(color: kInk, fontSize: 26, fontWeight: FontWeight.bold))),
+                  CircleAvatar(radius: 32, backgroundColor: theme.colorScheme.secondaryContainer, child: Text(name[0].toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold))),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -106,8 +106,8 @@ class ProfileTab extends StatelessWidget {
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(20)),
-                        child: Text('${roles[store.role] ?? ''} · ${store.shop?['name'] ?? ''}', style: const TextStyle(color: kInk, fontSize: 12)),
+                        decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(20)),
+                        child: Text('${roles[store.role] ?? ''} · ${store.shop?['name'] ?? ''}', style: const TextStyle(fontSize: 12)),
                       ),
                     ]),
                   ),
@@ -117,7 +117,7 @@ class ProfileTab extends StatelessWidget {
             ),
             SectionCard(title: tr('Mon code', 'رمزي'), icon: NI.badge, children: [
               Row(children: [
-                Expanded(child: SelectableText(store.myCode.isEmpty ? '—' : store.myCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2))),
+                Expanded(child: SelectableText(store.myCode.isEmpty ? '—' : store.myCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 2))),
                 IconButton.filledTonal(
                   icon: const NIcon(NI.copy),
                   onPressed: store.myCode.isEmpty ? null : () { Clipboard.setData(ClipboardData(text: store.myCode)); snack(context, tr('Code copié', 'تم نسخ الرمز')); },
