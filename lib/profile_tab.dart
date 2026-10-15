@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'icons.dart';
 
 const appVersion = '0.3.0';
 
@@ -71,7 +72,7 @@ class ProfileTab extends StatelessWidget {
         content: Text(tr('Votre compte et vos données seront supprimés définitivement.', 'سيتم حذف حسابك وبياناتك نهائيًا.')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
-          FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red), onPressed: () => Navigator.pop(d, true), child: Text(tr('Supprimer', 'حذف'))),
+          FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white), onPressed: () => Navigator.pop(d, true), child: Text(tr('Supprimer', 'حذف'))),
         ],
       ),
     );
@@ -94,38 +95,38 @@ class ProfileTab extends StatelessWidget {
             FadeSlideIn(
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(24), gradient: const LinearGradient(colors: [brandDark, brandLight])),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Row(children: [
-                  CircleAvatar(radius: 32, backgroundColor: Colors.white24, child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.bold))),
+                  CircleAvatar(radius: 32, backgroundColor: kAccent, child: Text(name[0].toUpperCase(), style: const TextStyle(color: kInk, fontSize: 26, fontWeight: FontWeight.bold))),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(name, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text(store.email, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                      Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(store.email, style: const TextStyle(color: kMuted, fontSize: 13)),
                       const SizedBox(height: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(20)),
-                        child: Text('${roles[store.role] ?? ''} · ${store.shop?['name'] ?? ''}', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                        decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(20)),
+                        child: Text('${roles[store.role] ?? ''} · ${store.shop?['name'] ?? ''}', style: const TextStyle(color: kInk, fontSize: 12)),
                       ),
                     ]),
                   ),
-                  IconButton(icon: const Icon(Icons.edit_rounded, color: Colors.white), onPressed: () => _editName(context)),
+                  IconButton(icon: const NIcon(NI.edit), onPressed: () => _editName(context)),
                 ]),
               ),
             ),
-            SectionCard(title: tr('Mon code', 'رمزي'), icon: Icons.badge_rounded, children: [
+            SectionCard(title: tr('Mon code', 'رمزي'), icon: NI.badge, children: [
               Row(children: [
                 Expanded(child: SelectableText(store.myCode.isEmpty ? '—' : store.myCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2))),
                 IconButton.filledTonal(
-                  icon: const Icon(Icons.copy_rounded),
+                  icon: const NIcon(NI.copy),
                   onPressed: store.myCode.isEmpty ? null : () { Clipboard.setData(ClipboardData(text: store.myCode)); snack(context, tr('Code copié', 'تم نسخ الرمز')); },
                 ),
               ]),
               const SizedBox(height: 4),
-              Text(tr('Donnez ce code au propriétaire d\'un commerce pour rejoindre son équipe.', 'أعطِ هذا الرمز لمالك المتجر للانضمام إلى فريقه.'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text(tr('Donnez ce code au propriétaire d\'un commerce pour rejoindre son équipe.', 'أعطِ هذا الرمز لمالك المتجر للانضمام إلى فريقه.'), style: const TextStyle(fontSize: 12, color: kMuted)),
             ]),
-            SectionCard(title: tr('Préférences', 'التفضيلات'), icon: Icons.tune_rounded, children: [
+            SectionCard(title: tr('Préférences', 'التفضيلات'), icon: NI.tune, children: [
               Text(tr('Langue', 'اللغة'), style: theme.textTheme.titleSmall),
               const SizedBox(height: 8),
               SizedBox(
@@ -152,13 +153,13 @@ class ProfileTab extends StatelessWidget {
                 ),
               ),
             ]),
-            SectionCard(title: tr('Compte', 'الحساب'), icon: Icons.lock_rounded, children: [
+            SectionCard(title: tr('Compte', 'الحساب'), icon: NI.lock, children: [
               ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.password_rounded), title: Text(tr('Changer le mot de passe', 'تغيير كلمة السر')), onTap: () => _changePassword(context)),
               ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
               ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.delete_forever, color: Colors.red), title: Text(tr('Supprimer mon compte', 'حذف حسابي'), style: const TextStyle(color: Colors.red)), onTap: () => _delete(context)),
             ]),
             const SizedBox(height: 16),
-            const Center(child: Text('Nqata Pro $appVersion', style: TextStyle(color: Colors.grey))),
+            const Center(child: Text('Nqata Pro $appVersion', style: TextStyle(color: kMuted))),
             const SizedBox(height: 8),
           ]);
         },
