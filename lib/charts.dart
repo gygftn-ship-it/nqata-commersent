@@ -28,7 +28,7 @@ class BarChartCard extends StatelessWidget {
     String f(double v) => fmt != null ? fmt!(v) : v.round().toString();
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700))),
@@ -59,7 +59,7 @@ class BarChartCard extends StatelessWidget {
                         height: h,
                         margin: EdgeInsets.symmetric(horizontal: data.length > 20 ? 1 : 3),
                         decoration: BoxDecoration(
-                          color: data[i].value == maxV ? cs.onSurface : kAccent,
+                          color: data[i].value == maxV ? cs.onSurface : cs.outline,
                           borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
                         ),
                       ),
@@ -94,10 +94,10 @@ class KpiCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: cs.outlineVariant)),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Row(children: [
-          ic(icon, size: 22),
+          ic(icon, size: 22, color: cs.onSurfaceVariant),
           const Spacer(),
           if (delta != null) _Delta(delta!),
         ]),
