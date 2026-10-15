@@ -132,14 +132,14 @@ class _StatsTabState extends State<StatsTab> {
           return RefreshIndicator(
             onRefresh: _reload,
             child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
-              Text(tr('Statistiques', 'الإحصاءات'), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+              Text(tr('Statistiques', 'الإحصاءات'), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
               for (final k in ['history', 'scans']) if (store.errors[k] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [Expanded(child: ErrorBanner(k, store.errors[k]!))])),
               const SizedBox(height: 12),
               // Aujourd'hui
               FadeSlideIn(
                 child: Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                  decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tr('Aujourd\'hui', 'اليوم'), style: const TextStyle(color: Colors.white70)),
                     const SizedBox(height: 8),
@@ -151,7 +151,7 @@ class _StatsTabState extends State<StatsTab> {
                         if (store.hasAmount) (fmtNum(todayMoney), 'DA'),
                       ])
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: const TextStyle(color: kAccent, fontSize: 22, fontWeight: FontWeight.w800, fontFeatures: [FontFeature.tabularFigures()]))),
+                          FittedBox(fit: BoxFit.scaleDown, child: Text(e.$1, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()]))),
                           Text(e.$2, style: const TextStyle(color: Colors.white70, fontSize: 12)),
                         ])),
                     ]),
@@ -241,7 +241,7 @@ class _StatsTabState extends State<StatsTab> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Fidélité des clients', 'ولاء الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
@@ -255,7 +255,7 @@ class _StatsTabState extends State<StatsTab> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(16), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Meilleurs clients', 'أفضل الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   if (top.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: kMuted))),
@@ -263,7 +263,7 @@ class _StatsTabState extends State<StatsTab> {
                     ListTile(
                       dense: true,
                       contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(radius: 14, backgroundColor: i == 0 ? kAccent : kAccentSoft, child: Text('${i + 1}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: kInk))),
+                      leading: CircleAvatar(radius: 14, backgroundColor: i == 0 ? kAccent : theme.colorScheme.secondaryContainer, child: Text('${i + 1}', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: i == 0 ? kInk : null))),
                       title: Text(store.clientName(top[i].key)),
                       subtitle: cur.spentBy[top[i].key] == null ? null : Text(fmtMoney(cur.spentBy[top[i].key]!)),
                       trailing: Text('${top[i].value} ${tr('visites', 'زيارة')}', style: const TextStyle(fontWeight: FontWeight.bold)),
