@@ -4,14 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
 import 'icons.dart';
+import 'ui.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
 const supabaseKey = 'sb_publishable_-zL5W-Pf5WMHAZZCONw4_g_RNbjhE5g';
 // ---- Identité visuelle : le ticket de caisse (encre, papier, jaune surligneur) ----
 const kInk = Color(0xFF131312);
-const kPaper = Color(0xFFF4F4F0);
-const kAccent = Color(0xFFFFC800);
+const kPaper = Colors.white;
+const kAccent = Color(0xFFFFD60A);
 const kAccentSoft = Color(0xFFFFF1B8);
 const kLine = Color(0xFFD8D7CF);
 const kMuted = Color(0xFF727068);
@@ -361,8 +362,8 @@ class NqataPro extends StatelessWidget {
   ThemeData _theme(Brightness b) {
     final dark = b == Brightness.dark;
     final fg = dark ? const Color(0xFFF3F2ED) : kInk;
-    final card = dark ? const Color(0xFF1A1A18) : Colors.white;
-    final bg = dark ? const Color(0xFF0F0F0E) : kPaper;
+    final card = dark ? const Color(0xFF22201A) : kCream;
+    final bg = dark ? const Color(0xFF14130F) : kPaper;
     final hair = dark ? const Color(0xFF2E2D29) : kLine;
     final soft = dark ? const Color(0xFF2A2A27) : const Color(0xFFEBEAE4);
     final scheme = ColorScheme(
@@ -389,42 +390,42 @@ class NqataPro extends StatelessWidget {
       outline: dark ? const Color(0xFF55544D) : const Color(0xFFC9C7BD),
       outlineVariant: hair,
     );
-    OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: c, width: w));
+    OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: c, width: w));
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
       dividerColor: hair,
       appBarTheme: AppBarTheme(backgroundColor: bg, foregroundColor: fg, elevation: 0, scrolledUnderElevation: 0, surfaceTintColor: Colors.transparent, titleTextStyle: TextStyle(color: fg, fontSize: 20, fontWeight: FontWeight.w700)),
-      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(minimumSize: const Size(64, 48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
-      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(64, 48), side: BorderSide(color: scheme.outline), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+      filledButtonTheme: FilledButtonThemeData(style: FilledButton.styleFrom(backgroundColor: kAccent, foregroundColor: kInk, disabledBackgroundColor: kAccent.withOpacity(0.4), minimumSize: const Size(64, 52), shape: const StadiumBorder(), textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16))),
+      outlinedButtonTheme: OutlinedButtonThemeData(style: OutlinedButton.styleFrom(minimumSize: const Size(64, 48), side: BorderSide(color: scheme.outline), shape: const StadiumBorder())),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: card,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: ob(scheme.outline),
-        enabledBorder: ob(scheme.outline),
-        focusedBorder: ob(fg, 1.6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        border: ob(Colors.transparent),
+        enabledBorder: ob(Colors.transparent),
+        focusedBorder: ob(kAccent, 2),
         errorBorder: ob(scheme.error),
         focusedErrorBorder: ob(scheme.error, 1.6),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: card,
-        selectedColor: soft,
-        side: BorderSide(color: scheme.outline),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        labelStyle: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 13),
+        selectedColor: kAccent,
+        side: BorderSide.none,
+        shape: const StadiumBorder(),
+        labelStyle: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 14),
         checkmarkColor: fg,
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
-          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? soft : card),
-          foregroundColor: WidgetStatePropertyAll(fg),
-          side: WidgetStatePropertyAll(BorderSide(color: scheme.outline)),
-          shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : card),
+          foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kInk : fg),
+          side: const WidgetStatePropertyAll(BorderSide.none),
+          shape: const WidgetStatePropertyAll(StadiumBorder()),
         ),
       ),
-      bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24)))),
+      bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32)))),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: dark ? const Color(0xFFF3F2ED) : kInk,
@@ -488,22 +489,20 @@ class _LoginPageState extends State<LoginPage> {
 
   Widget _f(TextEditingController c, String l, {bool secret = false, TextInputType? type}) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, obscureText: secret, keyboardType: type, decoration: InputDecoration(labelText: l, border: const OutlineInputBorder())),
+        child: TextField(controller: c, obscureText: secret, keyboardType: type, decoration: InputDecoration(labelText: l)),
       );
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        body: SafeArea(
-          child: Center(
+        body: NqScreen(
+          title: 'Nqata Pro',
+          header: [Text(tr('Espace commerçant', 'فضاء التاجر'), style: const TextStyle(color: Colors.white70, fontSize: 17))],
+          body: Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  const Text('NQATA PRO', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 3)),
-                  const SizedBox(height: 40),
-                  Text(tr('Espace commerçant', 'فضاء التاجر'), style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 20),
                   if (signup) _f(name, tr('Votre prénom', 'اسمك')),
                   _f(email, 'E-mail', type: TextInputType.emailAddress),
                   _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
@@ -555,13 +554,15 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
 
   Widget _f(TextEditingController c, String l) => Padding(
         padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, decoration: InputDecoration(labelText: l, border: const OutlineInputBorder())),
+        child: TextField(controller: c, decoration: InputDecoration(labelText: l)),
       );
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tr('Inscrire mon commerce', 'تسجيل متجري')), actions: [IconButton(icon: const Icon(Icons.logout), onPressed: store.signOut)]),
-        body: ListView(padding: const EdgeInsets.all(20), children: [
+        body: NqScreen(
+          title: tr('Mon commerce', 'متجري'),
+          action: HeaderPill(icon: Icons.logout_rounded, label: tr('Quitter', 'خروج'), onTap: store.signOut),
+          body: ListView(padding: const EdgeInsets.all(24), children: [
           Text(tr('Bienvenue ! Décrivez votre commerce. L\'équipe Nqata le validera avant l\'activation.', 'مرحبًا! صف متجرك. سيقوم فريق نقطة بالموافقة عليه قبل التفعيل.')),
           const SizedBox(height: 16),
           _f(name, tr('Nom du commerce', 'اسم المتجر')),
@@ -577,6 +578,7 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
           Text(tr('Vous faites partie de l\'équipe d\'un commerce ? Donnez votre code au propriétaire : ${store.myCode}', 'أنت ضمن فريق متجر؟ أعطِ رمزك للمالك: ${store.myCode}'), style: const TextStyle(color: kMuted)),
           TextButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
         ]),
+        ),
       );
 }
 
@@ -589,8 +591,10 @@ class InfoPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final pending = kind == 'pending';
     return Scaffold(
-      appBar: AppBar(actions: [IconButton(icon: const Icon(Icons.logout), onPressed: store.signOut)]),
-      body: Center(
+      body: NqScreen(
+        title: 'Nqata Pro',
+        action: HeaderPill(icon: Icons.logout_rounded, label: tr('Quitter', 'خروج'), onTap: store.signOut),
+        body: Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -607,6 +611,7 @@ class InfoPage extends StatelessWidget {
             FilledButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
           ]),
         ),
+      ),
       ),
     );
   }
