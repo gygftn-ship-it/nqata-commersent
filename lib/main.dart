@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'local_store.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
 import 'icons.dart';
@@ -226,7 +226,7 @@ class Store extends ChangeNotifier {
 
   void setLang(String l) {
     lang = l;
-    SharedPreferences.getInstance().then((p) => p.setString('lang', l));
+    FileStore.set('lang', l);
     notifyListeners();
   }
 
@@ -306,7 +306,7 @@ class Store extends ChangeNotifier {
 
   void setTheme(ThemeMode m) {
     themeMode = m;
-    SharedPreferences.getInstance().then((p) => p.setString('theme', m == ThemeMode.light ? 'light' : m == ThemeMode.dark ? 'dark' : 'system'));
+    FileStore.set('theme', m == ThemeMode.light ? 'light' : m == ThemeMode.dark ? 'dark' : 'system');
     notifyListeners();
   }
 
@@ -362,10 +362,14 @@ Future<void> main() async {
   // Au lieu d'un écran gris muet, on affiche l'erreur pour pouvoir la lire / la capturer.
   ErrorWidget.builder = (d) => _fatal('Erreur d\'affichage', '${d.exceptionAsString()}\n\n${(d.stack?.toString() ?? '').split('\n').take(8).join('\n')}');
   try {
-    final prefs = await SharedPreferences.getInstance();
-    lang = prefs.getString('lang') ?? 'fr';
-    store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
-    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+    await FileStore.init();
+    lang = FileStore.get('lang') ?? 'fr';
+    store.themeMode = switch (FileStore.get('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
+    await Supabase.initialize(
+      url: supabaseUrl,
+      anonKey: supabaseKey,
+      authOptions: FlutterAuthClientOptions(localStorage: FileLocalStorage(), pkceAsyncStorage: FileAsyncStorage()),
+    );
     if (Supabase.instance.client.auth.currentSession != null) store.start();
     runApp(const NqataPro());
   } catch (e, st) {
