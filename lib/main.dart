@@ -346,14 +346,31 @@ class Store extends ChangeNotifier {
 
 final store = Store();
 
+Widget _fatal(String title, String msg) => Directionality(
+      textDirection: TextDirection.ltr,
+      child: Material(
+        color: kInk,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 48, 16, 16),
+          child: SelectableText('$title\n\n$msg', style: const TextStyle(color: Colors.white, fontSize: 12)),
+        ),
+      ),
+    );
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final prefs = await SharedPreferences.getInstance();
-  lang = prefs.getString('lang') ?? 'fr';
-  store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
-  if (Supabase.instance.client.auth.currentSession != null) store.start();
-  runApp(const NqataPro());
+  // Au lieu d'un écran gris muet, on affiche l'erreur pour pouvoir la lire / la capturer.
+  ErrorWidget.builder = (d) => _fatal('Erreur d\'affichage', '${d.exceptionAsString()}\n\n${(d.stack?.toString() ?? '').split('\n').take(8).join('\n')}');
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    lang = prefs.getString('lang') ?? 'fr';
+    store.themeMode = switch (prefs.getString('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
+    await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+    if (Supabase.instance.client.auth.currentSession != null) store.start();
+    runApp(const NqataPro());
+  } catch (e, st) {
+    runApp(_fatal('Erreur au démarrage', '$e\n\n${st.toString().split('\n').take(8).join('\n')}'));
+  }
 }
 
 class NqataPro extends StatelessWidget {
