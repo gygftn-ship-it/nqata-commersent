@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'icons.dart';
+import 'ui.dart';
 
 /// Statistiques d'un client calculées depuis l'historique (6 derniers mois).
 class ClientStat {
@@ -99,50 +100,32 @@ class _ClientsTabState extends State<ClientsTab> {
             _Filter.inactive: '${tr('À relancer', 'للتذكير')} ($inactiveCount)',
           };
 
-          return Column(children: [
+          final sortLabels = {_Sort.points: tr('Plus de points', 'الأكثر نقاطًا'), _Sort.recent: tr('Dernière visite', 'آخر زيارة'), _Sort.visits: tr('Plus de visites', 'الأكثر زيارات'), _Sort.name: tr('Nom (A-Z)', 'الاسم (أ-ي)')};
+          return NqScreen(
+            title: tr('Clients', 'الزبائن'),
+            action: PopupMenuButton<_Sort>(
+              tooltip: tr('Trier', 'ترتيب'),
+              onSelected: (v) => setState(() => sort = v),
+              itemBuilder: (_) => [for (final e in sortLabels.entries) CheckedPopupMenuItem(value: e.key, checked: sort == e.key, child: Text(e.value))],
+              child: HeaderPill(icon: Icons.swap_vert_rounded, label: tr('Trier', 'ترتيب')),
+            ),
+            header: [
+              HeaderSearch(hint: '${tr('Rechercher parmi', 'ابحث بين')} ${store.clients.length} ${tr('clients', 'زبون')}', onChanged: (v) => setState(() => q = v)),
+              HeaderChips(labels: [for (final f in _Filter.values) labels[f]!], selected: _Filter.values.indexOf(filter), onSelected: (i) => setState(() => filter = _Filter.values[i])),
+            ],
+            body: Column(children: [
             if (store.errors['clients'] != null) ErrorBanner(tr('liste des clients', 'قائمة الزبائن'), store.errors['clients']!),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-              child: Row(children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: (v) => setState(() => q = v),
-                    decoration: InputDecoration(prefixIcon: const NIcon(NI.search, size: 22), hintText: '${tr('Rechercher parmi', 'ابحث بين')} ${store.clients.length} ${tr('clients', 'زبون')}', border: const OutlineInputBorder()),
-                  ),
-                ),
-                PopupMenuButton<_Sort>(
-                  icon: const NIcon(NI.sort),
-                  tooltip: tr('Trier', 'ترتيب'),
-                  onSelected: (v) => setState(() => sort = v),
-                  itemBuilder: (_) => [
-                    CheckedPopupMenuItem(value: _Sort.points, checked: sort == _Sort.points, child: Text(tr('Plus de points', 'الأكثر نقاطًا'))),
-                    CheckedPopupMenuItem(value: _Sort.recent, checked: sort == _Sort.recent, child: Text(tr('Dernière visite', 'آخر زيارة'))),
-                    CheckedPopupMenuItem(value: _Sort.visits, checked: sort == _Sort.visits, child: Text(tr('Plus de visites', 'الأكثر زيارات'))),
-                    CheckedPopupMenuItem(value: _Sort.name, checked: sort == _Sort.name, child: Text(tr('Nom (A-Z)', 'الاسم (أ-ي)'))),
-                  ],
-                ),
-              ]),
-            ),
-            SizedBox(
-              height: 48,
-              child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-                for (final f in _Filter.values)
-                  Padding(
-                    padding: const EdgeInsetsDirectional.only(end: 8),
-                    child: FilterChip(label: Text(labels[f]!), selected: filter == f, onSelected: (_) => setState(() => filter = f)),
-                  ),
-              ]),
-            ),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _reload,
-                child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.only(bottom: 12), children: [
+                child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
                   if (list.isEmpty) Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(tr('Aucun client', 'لا زبائن')))),
                   for (var i = 0; i < list.length; i++) FadeSlideIn(index: i, child: _tile(list[i], stats['${list[i]['client_id']}'])),
                 ]),
               ),
             ),
-          ]);
+          ]),
+          );
         },
       );
 
@@ -150,9 +133,16 @@ class _ClientsTabState extends State<ClientsTab> {
     final name = '${c['display_name']}';
     final pts = (c['points'] as num).toInt();
     final ready = pts >= store.threshold;
-    return ListTile(
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+      color: cardColor(context),
+      borderRadius: BorderRadius.circular(26),
+      clipBehavior: Clip.antiAlias,
+      child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => ClientSheet(client: c)),
-      leading: CircleAvatar(backgroundColor: ready ? kAccent : Theme.of(context).colorScheme.secondaryContainer, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: ready ? kInk : null))),
+      leading: CircleAvatar(backgroundColor: ready ? kAccent : (isDark(context) ? const Color(0xFF3A372E) : Colors.white), child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: ready ? kInk : null))),
       title: Text(name),
       subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('$pts ${tr('pts', 'نقطة')} · ${st?.visits ?? 0} ${tr('visites', 'زيارة')} · ${since(c['last_scan_at'] as String?)}'),
@@ -172,6 +162,8 @@ class _ClientsTabState extends State<ClientsTab> {
               child: Text(tr('Valider', 'تأكيد')),
             )
           : const Icon(Icons.chevron_right_rounded),
+    ),
+    ),
     );
   }
 }
@@ -183,7 +175,7 @@ class ClientSheet extends StatelessWidget {
 
   Widget _kpi(BuildContext context, Object i, String v, String l) => Container(
         padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+        decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(24)),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           ic(i, size: 20),
           FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
