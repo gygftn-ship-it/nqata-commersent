@@ -7,6 +7,7 @@ import 'shop_tab.dart';
 import 'stats_tab.dart';
 import 'profile_tab.dart';
 import 'icons.dart';
+import 'ui.dart';
 
 // ---------- Utilitaires partagés ----------
 class FadeSlideIn extends StatelessWidget {
@@ -48,8 +49,8 @@ class SectionCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.only(top: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: cs.outlineVariant)),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: BorderRadius.circular(28)),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           ic(icon, size: 22),
@@ -159,16 +160,10 @@ class _ShellState extends State<Shell> {
     ];
     if (tab >= items.length) tab = items.length - 1;
     return Scaffold(
-      body: SafeArea(
-        child: Column(children: [
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
-              child: KeyedSubtree(key: ValueKey('${items[tab].$3}'), child: items[tab].$1),
-            ),
-          ),
-        ]),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
+        child: KeyedSubtree(key: ValueKey('${items[tab].$3}'), child: items[tab].$1),
       ),
       bottomNavigationBar: _NavBar(
         index: tab,
@@ -179,7 +174,7 @@ class _ShellState extends State<Shell> {
   }
 }
 
-/// Barre du bas : icônes Nqata, trait jaune sous le store de l'onglet actif.
+/// Barre du bas flottante (beige) : l'onglet actif devient une pastille jaune avec son nom.
 class _NavBar extends StatelessWidget {
   final int index;
   final List<(NI, String)> items;
@@ -188,34 +183,49 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final dark = isDark(context);
     return Container(
-      decoration: BoxDecoration(color: cs.surface, border: Border(top: BorderSide(color: cs.outlineVariant))),
+      color: sheetColor(context),
       child: SafeArea(
         top: false,
-        child: Row(children: [
-          for (var i = 0; i < items.length; i++)
-            Expanded(
-              child: InkResponse(
-                onTap: () => onTap(i),
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(14, 6, 14, 10),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: dark ? const Color(0xFF2A2720) : kNavBeige,
+            borderRadius: BorderRadius.circular(40),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 18, offset: const Offset(0, 6))],
+          ),
+          child: Row(children: [
+            for (var i = 0; i < items.length; i++)
+              Expanded(
+                flex: i == index ? 3 : 1,
                 child: Semantics(
                   button: true,
                   selected: i == index,
-                  child: Stack(alignment: Alignment.topCenter, children: [
-                    if (i == index) Container(width: 24, height: 3, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2))),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 8),
-                      child: Column(mainAxisSize: MainAxisSize.min, children: [
-                        NIcon(items[i].$1, size: 24, color: i == index ? cs.onSurface : cs.onSurfaceVariant),
-                        const SizedBox(height: 4),
-                        Text(items[i].$2, style: TextStyle(fontSize: 11.5, fontWeight: i == index ? FontWeight.w700 : FontWeight.w500, color: i == index ? cs.onSurface : cs.onSurfaceVariant)),
+                  label: items[i].$2,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => onTap(i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: i == index ? kAccent : Colors.transparent, borderRadius: BorderRadius.circular(30)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        NIcon(items[i].$1, size: 24, color: i == index ? kInk : (dark ? Colors.white60 : kMuted)),
+                        if (i == index) ...[
+                          const SizedBox(width: 6),
+                          Flexible(child: Text(items[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kInk))),
+                        ],
                       ]),
                     ),
-                  ]),
+                  ),
                 ),
               ),
-            ),
-        ]),
+          ]),
+        ),
       ),
     );
   }
