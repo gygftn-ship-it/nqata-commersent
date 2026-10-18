@@ -3,8 +3,9 @@ import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'icons.dart';
+import 'ui.dart';
 
-const appVersion = '0.3.0';
+const appVersion = '0.4.0';
 
 /// Onglet « Profil » : compte, code personnel, langue, thème, sécurité.
 class ProfileTab extends StatelessWidget {
@@ -16,7 +17,7 @@ class ProfileTab extends StatelessWidget {
       context: context,
       builder: (d) => AlertDialog(
         title: Text(tr('Modifier mon nom', 'تعديل اسمي')),
-        content: TextField(controller: c, autofocus: true, decoration: InputDecoration(labelText: tr('Votre prénom', 'اسمك'), border: const OutlineInputBorder())),
+        content: TextField(controller: c, autofocus: true, decoration: InputDecoration(labelText: tr('Votre prénom', 'اسمك'))),
         actions: [
           TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
           FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(tr('Enregistrer', 'حفظ'))),
@@ -91,30 +92,53 @@ class ProfileTab extends StatelessWidget {
           final theme = Theme.of(context);
           final roles = {'owner': tr('Propriétaire', 'مالك'), 'manager': tr('Gérant', 'مدير'), 'employee': tr('Employé', 'موظف')};
           final name = store.myName.isEmpty ? '—' : store.myName;
-          return ListView(padding: const EdgeInsets.all(16), children: [
-            FadeSlideIn(
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
-                child: Row(children: [
-                  CircleAvatar(radius: 32, backgroundColor: theme.colorScheme.secondaryContainer, child: Text(name[0].toUpperCase(), style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold))),
-                  const SizedBox(width: 16),
+          return NqScreen(
+            title: tr('Profil', 'الحساب'),
+            header: [
+              Row(children: [
+                Stack(clipBehavior: Clip.none, children: [
+                  Container(
+                    width: 84,
+                    height: 84,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(shape: BoxShape.circle, color: kHeaderTop, border: Border.all(color: kBronze, width: 3)),
+                    child: Text(name[0].toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w800)),
+                  ),
+                  PositionedDirectional(
+                    end: -4,
+                    bottom: -4,
+                    child: GestureDetector(
+                      onTap: () => _editName(context),
+                      child: Container(padding: const EdgeInsets.all(7), decoration: BoxDecoration(color: kAccent, shape: BoxShape.circle, border: Border.all(color: kHeaderTop, width: 2)), child: const Icon(Icons.edit_rounded, size: 15, color: kInk)),
+                    ),
+                  ),
+                ]),
+                const SizedBox(width: 18),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(store.email, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white60, fontSize: 15)),
+                  ]),
+                ),
+              ]),
+              YellowCard(
+                child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
                   Expanded(
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                      Text(store.email, style: const TextStyle(color: kMuted, fontSize: 13)),
+                      Text(roles[store.role] ?? '', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-                        decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(20)),
-                        child: Text('${roles[store.role] ?? ''} · ${store.shop?['name'] ?? ''}', style: const TextStyle(fontSize: 12)),
-                      ),
+                      Text('${store.shop?['name'] ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16)),
                     ]),
                   ),
-                  IconButton(icon: const NIcon(NI.edit), onPressed: () => _editName(context)),
+                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                    AnimatedCount(store.clients.length, style: const TextStyle(fontSize: 44, fontWeight: FontWeight.w800, height: 1)),
+                    Text(tr('clients', 'زبون'), style: const TextStyle(fontSize: 15)),
+                  ]),
                 ]),
               ),
-            ),
+            ],
+            body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
             SectionCard(title: tr('Mon code', 'رمزي'), icon: NI.badge, children: [
               Row(children: [
                 Expanded(child: SelectableText(store.myCode.isEmpty ? '—' : store.myCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 2))),
@@ -161,7 +185,8 @@ class ProfileTab extends StatelessWidget {
             const SizedBox(height: 16),
             const Center(child: Text('Nqata Pro $appVersion', style: TextStyle(color: kMuted))),
             const SizedBox(height: 8),
-          ]);
+          ]),
+          );
         },
       );
 }
