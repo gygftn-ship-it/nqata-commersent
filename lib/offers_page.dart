@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'ui.dart';
 import 'tabs.dart';
 import 'icons.dart';
 
@@ -41,19 +42,21 @@ class _OffersPageState extends State<OffersPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(tr('Offres', 'العروض'))),
-        body: ListenableBuilder(
+        body: NqScreen(
+          title: tr('Offres', 'العروض'),
+          action: HeaderPill(icon: Icons.arrow_back_rounded, label: tr('Retour', 'رجوع'), onTap: () => Navigator.pop(context)),
+          body: ListenableBuilder(
           listenable: store,
           builder: (_, __) {
             final title = Theme.of(context).textTheme.titleMedium;
-            return ListView(padding: const EdgeInsets.all(16), children: [
+            return ListView(padding: const EdgeInsets.all(20), children: [
               Text(tr('Nouvelle offre', 'عرض جديد'), style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 12),
               Wrap(spacing: 8, children: [
                 for (var i = 0; i < templates.length; i++) ChoiceChip(label: Text(tr(templates[i].$1, templates[i].$2)), selected: tpl == i, onSelected: (_) => setState(() => tpl = i)),
               ]),
               const SizedBox(height: 12),
-              TextField(controller: custom, decoration: InputDecoration(labelText: tr('Ou écrivez votre offre', 'أو اكتب عرضك'), border: const OutlineInputBorder())),
+              TextField(controller: custom, decoration: InputDecoration(labelText: tr('Ou écrivez votre offre', 'أو اكتب عرضك'))),
               const SizedBox(height: 16),
               Text(tr('Destinataires', 'المستلمون'), style: title),
               const SizedBox(height: 8),
@@ -93,6 +96,7 @@ class _OffersPageState extends State<OffersPage> {
                 ),
             ]);
           },
+        ),
         ),
       );
 }
