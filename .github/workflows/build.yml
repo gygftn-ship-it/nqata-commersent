@@ -31,7 +31,7 @@ jobs:
       - run: flutter pub get
       - name: Icône de l'app
         run: dart run flutter_launcher_icons
-      - run: flutter build apk --release --no-shrink
+      - run: flutter build apk --release
 
       - name: Publier l'APK dans Releases
         env:
