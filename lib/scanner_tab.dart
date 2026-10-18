@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'main.dart';
 import 'tabs.dart';
+import 'ui.dart';
 import 'icons.dart';
 
 class ScanFrame extends StatefulWidget {
@@ -74,7 +75,7 @@ Future<void> showAmountDialog(BuildContext context, String scanId, double? curre
     context: context,
     builder: (d) => AlertDialog(
       title: Text(tr('Montant de l\'achat', 'مبلغ الشراء')),
-      content: TextField(controller: c, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(suffixText: 'DA', border: const OutlineInputBorder(), labelText: tr('Montant', 'المبلغ'))),
+      content: TextField(controller: c, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(suffixText: 'DA', labelText: tr('Montant', 'المبلغ'))),
       actions: [
         TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
         FilledButton(onPressed: () => Navigator.pop(d, true), child: Text(tr('Enregistrer', 'حفظ'))),
@@ -144,11 +145,11 @@ class _ScannerTabState extends State<ScannerTab> {
 
   Widget _mini(Object i, String v, String l) => Expanded(
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: Theme.of(context).colorScheme.outlineVariant)),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+          decoration: BoxDecoration(color: cardColor(context), borderRadius: BorderRadius.circular(24)),
           child: Column(children: [
             ic(i, size: 20),
-            Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(v, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
             Text(l, style: const TextStyle(fontSize: 11), maxLines: 1, overflow: TextOverflow.ellipsis),
           ]),
         ),
@@ -161,11 +162,16 @@ class _ScannerTabState extends State<ScannerTab> {
           final valid = store.scans.where((s) => s['undone_at'] == null).toList();
           final points = valid.fold<int>(0, (a, s) => a + ((s['points'] as num?)?.toInt() ?? 0));
           final recent = store.scans.take(6).toList();
-          return Column(children: [
+          return NqScreen(
+            title: tr('Scanner', 'مسح'),
+            action: HeaderPill(icon: Icons.storefront_rounded, label: '${store.shop?['name'] ?? ''}'),
+            body: Column(children: [
             Expanded(
               flex: 5,
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                child: ClipRRect(
+                borderRadius: BorderRadius.circular(32),
                 child: Stack(children: [
                   MobileScanner(
                     controller: controller,
@@ -176,15 +182,6 @@ class _ScannerTabState extends State<ScannerTab> {
                     },
                   ),
                   const ScanFrame(),
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                      child: Text('${store.shop?['name'] ?? ''}', style: const TextStyle(color: Colors.white)),
-                    ),
-                  ),
                   Positioned(
                     top: 8,
                     right: 8,
@@ -211,12 +208,13 @@ class _ScannerTabState extends State<ScannerTab> {
                   ),
                 ]),
               ),
+              ),
             ),
             Expanded(
               flex: 4,
               child: RefreshIndicator(
                 onRefresh: store.refresh,
-                child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(12, 12, 12, 8), children: [
+                child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 16, 16, 12), children: [
                   Row(children: [
                     _mini(NI.check, '${valid.length}', tr('Passages', 'الزيارات')),
                     const SizedBox(width: 8),
@@ -230,7 +228,7 @@ class _ScannerTabState extends State<ScannerTab> {
                       child: TextField(
                         controller: manual,
                         textCapitalization: TextCapitalization.characters,
-                        decoration: InputDecoration(prefixIcon: const Icon(Icons.keyboard_rounded), labelText: tr('Code client (ou téléphone)', 'رمز الزبون (أو الهاتف)'), border: const OutlineInputBorder()),
+                        decoration: InputDecoration(prefixIcon: const Icon(Icons.keyboard_rounded), labelText: tr('Code client (ou téléphone)', 'رمز الزبون (أو الهاتف)')),
                         onSubmitted: (v) { _handle(v); manual.clear(); },
                       ),
                     ),
@@ -267,7 +265,8 @@ class _ScannerTabState extends State<ScannerTab> {
                 ]),
               ),
             ),
-          ]);
+          ]),
+          );
         },
       );
 }
@@ -353,7 +352,7 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
                     controller: amount,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                     onTap: () => timer?.cancel(),
-                    decoration: InputDecoration(labelText: tr('Montant de l\'achat (optionnel)', 'مبلغ الشراء (اختياري)'), suffixText: 'DA', border: const OutlineInputBorder()),
+                    decoration: InputDecoration(labelText: tr('Montant de l\'achat (optionnel)', 'مبلغ الشراء (اختياري)'), suffixText: 'DA'),
                     onSubmitted: (_) => _saveAmount(),
                   ),
                 ),
