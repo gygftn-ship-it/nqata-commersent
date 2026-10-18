@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'icons.dart';
+import 'ui.dart';
 import 'charts.dart';
 
 class _Agg {
@@ -64,7 +65,7 @@ class _StatsTabState extends State<StatsTab> {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) {
-          if (!store.historyLoaded) return const Center(child: CircularProgressIndicator());
+          if (!store.historyLoaded) return NqScreen(title: tr('Statistiques', 'الإحصاءات'), body: const Center(child: CircularProgressIndicator()));
           final theme = Theme.of(context);
           final now = DateTime.now();
           final today = DateTime(now.year, now.month, now.day);
@@ -129,17 +130,18 @@ class _StatsTabState extends State<StatsTab> {
           final todayPts = todayScans.fold<int>(0, (a, s) => a + ((s['points'] as num?)?.toInt() ?? 0));
           final todayMoney = todayScans.fold<double>(0, (a, s) => a + (amountOf(s) ?? 0));
 
-          return RefreshIndicator(
+          return NqScreen(
+            title: tr('Statistiques', 'الإحصاءات'),
+            body: RefreshIndicator(
             onRefresh: _reload,
-            child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(16), children: [
-              Text(tr('Statistiques', 'الإحصاءات'), style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+            child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.all(20), children: [
               for (final k in ['history', 'scans']) if (store.errors[k] != null) Padding(padding: const EdgeInsets.only(top: 8), child: Row(children: [Expanded(child: ErrorBanner(k, store.errors[k]!))])),
               const SizedBox(height: 12),
               // Aujourd'hui
               FadeSlideIn(
                 child: Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: kInk, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                  decoration: BoxDecoration(color: const Color(0xFF16140F), borderRadius: BorderRadius.circular(28)),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(tr('Aujourd\'hui', 'اليوم'), style: const TextStyle(color: Colors.white70)),
                     const SizedBox(height: 8),
@@ -241,7 +243,7 @@ class _StatsTabState extends State<StatsTab> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(24)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Fidélité des clients', 'ولاء الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 12),
@@ -255,7 +257,7 @@ class _StatsTabState extends State<StatsTab> {
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(12), border: Border.all(color: theme.colorScheme.outlineVariant)),
+                decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerHighest, borderRadius: BorderRadius.circular(24)),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(tr('Meilleurs clients', 'أفضل الزبائن'), style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   if (top.isEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(tr('Pas encore de données', 'لا بيانات بعد'), style: const TextStyle(color: kMuted))),
@@ -271,6 +273,7 @@ class _StatsTabState extends State<StatsTab> {
                 ]),
               ),
             ]),
+          ),
           );
         },
       );
