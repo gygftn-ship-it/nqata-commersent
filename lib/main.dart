@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
 import 'icons.dart';
 import 'ui.dart';
+import 'loading_screen.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
@@ -65,6 +66,7 @@ class Store extends ChangeNotifier {
   List<Map<String, dynamic>> history = [], redeemHistory = [];
   final errors = <String, String>{}; // dernière erreur de lecture par source (clients, scans...)
   bool hasAmount = true, historyLoaded = false, historyStale = true, historyLoading = false;
+  DateTime? historyAt; // dernière lecture réussie de l'historique
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
@@ -147,6 +149,7 @@ class Store extends ChangeNotifier {
     historyLoaded = true;
     historyStale = false;
     historyLoading = false;
+    historyAt = DateTime.now();
     notifyListeners();
   }
 
@@ -359,6 +362,8 @@ Widget _fatal(String title, String msg) => Directionality(
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Écran de démarrage immédiat (mascotte) pendant l'initialisation ; sans texte car la langue n'est pas encore lue.
+  runApp(const MaterialApp(debugShowCheckedModeBanner: false, home: Scaffold(backgroundColor: kHeaderTop, body: MascotLoader())));
   // Au lieu d'un écran gris muet, on affiche l'erreur pour pouvoir la lire / la capturer.
   ErrorWidget.builder = (d) => _fatal('Erreur d\'affichage', '${d.exceptionAsString()}\n\n${(d.stack?.toString() ?? '').split('\n').take(8).join('\n')}');
   try {
@@ -460,7 +465,7 @@ class NqataPro extends StatelessWidget {
 
   Widget _home() {
     if (!store.loggedIn) return const LoginPage();
-    if (!store.loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!store.loaded) return Scaffold(backgroundColor: kHeaderTop, body: MascotLoader(message: tr('Chargement de votre commerce…', 'جارٍ تحميل متجرك…')));
     if (store.loadError != null) return const InfoPage(kind: 'error');
     if (store.shop == null) return const RegisterShopPage();
     if (!store.active) return const InfoPage(kind: 'pending');
