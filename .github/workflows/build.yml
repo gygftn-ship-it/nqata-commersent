@@ -28,6 +28,16 @@ jobs:
           sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application|' android/app/src/main/AndroidManifest.xml
           sed -i 's|android:label="nqata_merchant"|android:label="Nqata Pro"|' android/app/src/main/AndroidManifest.xml
 
+      - name: Installer le NDK (3 tentatives, le téléchargement est parfois corrompu)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          for i in 1 2 3; do
+            if yes | "$SDKM" --install "ndk;28.2.13676358"; then break; fi
+            echo "Tentative $i échouée, nettoyage et nouvel essai"
+            rm -rf "$ANDROID_HOME/ndk/28.2.13676358" "$ANDROID_HOME/.temp"
+            sleep 5
+          done
+
       - run: flutter pub get
       - name: Icône de l'app
         run: dart run flutter_launcher_icons
