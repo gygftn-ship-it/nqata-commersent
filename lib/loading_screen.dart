@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'main.dart';
+import 'mascot_data.dart';
 import 'ui.dart';
 
 /// Écran de chargement de l'app : la mascotte Nqata flotte doucement sur un halo jaune.
@@ -42,8 +43,9 @@ class _MascotLoaderState extends State<MascotLoader> with SingleTickerProviderSt
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(size * 0.24),
-          child: Image.asset(
-            'assets/mascot.png',
+          child: Image.memory(
+            kMascotBytes,
+            gaplessPlayback: true,
             width: size,
             height: size,
             fit: BoxFit.cover,
