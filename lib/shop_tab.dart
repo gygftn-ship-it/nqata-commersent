@@ -185,15 +185,6 @@ class _ShopTabState extends State<ShopTab> {
         child: Text(t, style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w600)),
       );
 
-  Widget _info(IconData i, String t) => Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(i, size: 18, color: kMuted),
-          const SizedBox(width: 8),
-          Expanded(child: Text(t, style: const TextStyle(fontSize: 14))),
-        ]),
-      );
-
   /// Aperçu de la vitrine, comme la voient les clients.
   Widget _preview() {
     final shop = store.shop;
@@ -202,26 +193,12 @@ class _ShopTabState extends State<ShopTab> {
     final r = store.rating;
     final isOpen = _isOpenNow(shop?['hours'] as String?);
     final catLabel = shopCats.firstWhere((c) => c.$1 == '${shop?['category']}', orElse: () => shopCats.last);
-    final description = '${shop?['description'] ?? ''}'.trim();
-    final address = '${shop?['address'] ?? ''}'.trim(), phone = '${shop?['phone'] ?? ''}'.trim(), hours = '${shop?['hours'] ?? ''}'.trim();
-    final hasLogo = logo != null && logo.isNotEmpty;
+    final description = '${shop?['description'] ?? ''}';
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (store.isOwner)
-        Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(tr('Aperçu : ce que voient vos clients', 'معاينة: ما يراه زبائنك'), style: const TextStyle(fontSize: 12, color: kMuted))),
       Stack(clipBehavior: Clip.none, children: [
         Container(
-          height: 160,
-          width: double.infinity,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(color: coverColor, borderRadius: BorderRadius.circular(22)),
-          child: cover == null || cover.isEmpty
-              ? null
-              : Image.network(
-                  cover,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                  loadingBuilder: (_, child, p) => p == null ? child : const Center(child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white70))),
-                ),
+          height: 150,
+          decoration: BoxDecoration(color: coverColor, borderRadius: BorderRadius.circular(22), image: cover == null || cover.isEmpty ? null : DecorationImage(image: NetworkImage(cover), fit: BoxFit.cover)),
         ),
         if (store.isOwner)
           PositionedDirectional(
@@ -243,9 +220,8 @@ class _ShopTabState extends State<ShopTab> {
               child: CircleAvatar(
                 radius: 38,
                 backgroundColor: Colors.black12,
-                backgroundImage: hasLogo ? NetworkImage(logo!) : null,
-                onBackgroundImageError: hasLogo ? (_, __) {} : null,
-                child: hasLogo ? null : Icon(store.isOwner ? Icons.add_a_photo_outlined : Icons.storefront_rounded),
+                backgroundImage: logo == null || logo.isEmpty ? null : NetworkImage(logo),
+                child: logo == null || logo.isEmpty ? Icon(store.isOwner ? Icons.add_a_photo_outlined : Icons.storefront_rounded) : null,
               ),
             ),
           ),
@@ -260,43 +236,10 @@ class _ShopTabState extends State<ShopTab> {
         if (isOpen != null) _chip(isOpen ? tr('Ouvert', 'مفتوح') : tr('Fermé', 'مغلق'), isOpen ? kOk : kDanger),
         _chip(r == null ? tr('Pas encore de note', 'لا تقييم بعد') : '★ ${(r['avg_rating'] as num).toStringAsFixed(1)} · ${r['reviews_count']} ${tr('avis', 'تقييم')}', kWarn),
       ]),
-      if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 12), child: Text(description, style: const TextStyle(height: 1.4))),
-      if (address.isNotEmpty) _info(Icons.place_outlined, address),
-      if (hours.isNotEmpty) _info(Icons.schedule_rounded, hours),
-      if (phone.isNotEmpty) _info(Icons.phone_outlined, phone),
+      if (description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(description)),
       if (store.isOwner)
-        Padding(padding: const EdgeInsets.only(top: 10), child: Text(tr('Touchez le logo pour le changer.', 'المس الشعار لتغييره.'), style: const TextStyle(fontSize: 12, color: kMuted))),
+        Padding(padding: const EdgeInsets.only(top: 8), child: Text(tr('Touchez le logo pour le changer.', 'المس الشعار لتغييره.'), style: const TextStyle(fontSize: 12, color: kMuted))),
     ]);
-  }
-
-  /// Propriétaire : ce qu'il reste à renseigner pour une vitrine complète.
-  Widget _completeness() {
-    final s = store.shop;
-    bool has(String k) => '${s?[k] ?? ''}'.trim().isNotEmpty;
-    final items = <(String, bool)>[
-      (tr('Logo', 'الشعار'), has('logo_url')),
-      (tr('Image de fond', 'صورة الخلفية'), has('cover_url') || has('cover_color')),
-      (tr('Description', 'الوصف'), has('description')),
-      (tr('Adresse', 'العنوان'), has('address')),
-      (tr('Téléphone', 'الهاتف'), has('phone')),
-      (tr('Horaires', 'ساعات العمل'), has('hours')),
-      (tr('Position sur la carte', 'الموقع على الخريطة'), s?['lat'] != null && s?['lng'] != null),
-      if (galleryOk) (tr('3 photos minimum', '3 صور على الأقل'), gallery.length >= 3),
-    ];
-    final done = items.where((e) => e.$2).length;
-    if (done == items.length) return const SizedBox.shrink();
-    return SectionCard(
-      title: tr('Complétez votre vitrine', 'أكمل واجهة متجرك'),
-      icon: NI.badge,
-      trailing: Text('$done/${items.length}', style: const TextStyle(fontWeight: FontWeight.w800)),
-      children: [
-        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(minHeight: 6, value: done / items.length)),
-        const SizedBox(height: 12),
-        Text(tr('Il manque :', 'ينقص:'), style: const TextStyle(fontSize: 12, color: kMuted)),
-        const SizedBox(height: 6),
-        Wrap(spacing: 8, runSpacing: 6, children: [for (final e in items) if (!e.$2) _chip(e.$1, kWarn)]),
-      ],
-    );
   }
 
   Widget _galleryGrid() {
@@ -333,7 +276,6 @@ class _ShopTabState extends State<ShopTab> {
               onRefresh: store.refresh,
               child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: EdgeInsets.fromLTRB(20, 20, 20, dirty ? 90 : 24), children: [
                 FadeSlideIn(child: _preview()),
-                if (store.isOwner) _completeness(),
                 if (store.isOwner) ...[
                   SectionCard(title: tr('Photos', 'الصور'), icon: NI.photos, children: [
                     Text(tr('Photos de votre commerce (${gallery.length}/$_maxGallery)', 'صور متجرك (${gallery.length}/$_maxGallery)'), style: theme.textTheme.titleSmall),
