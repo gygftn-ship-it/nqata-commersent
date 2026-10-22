@@ -289,3 +289,26 @@ class AuthNotice extends StatelessWidget {
     );
   }
 }
+
+/// Écran de chargement de marque (remplace le cercle qui tourne sur fond vide).
+class SplashPage extends StatelessWidget {
+  const SplashPage({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final colors = _headerColors(context);
+    return Scaffold(
+      body: Container(
+        decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: colors)),
+        child: Center(
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const AuthIllustration(),
+            const SizedBox(height: 8),
+            const NqWordmark(),
+            const SizedBox(height: 22),
+            SizedBox(width: 120, child: LinearProgressIndicator(minHeight: 4, borderRadius: BorderRadius.circular(4), color: isDark(context) ? kAccent : kInk, backgroundColor: Colors.black12)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
