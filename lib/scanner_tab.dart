@@ -8,8 +8,12 @@ import 'ui.dart';
 import 'offers_page.dart';
 import 'icons.dart';
 
+enum ScanState { idle, success, error }
+
+/// Cadre de scan : zone assombrie autour, coins qui passent au vert (succès) ou au rouge (erreur), ligne animée.
 class ScanFrame extends StatefulWidget {
-  const ScanFrame({super.key});
+  final ScanState state;
+  const ScanFrame({super.key, this.state = ScanState.idle});
   @override
   State<ScanFrame> createState() => _ScanFrameState();
 }
@@ -21,42 +25,84 @@ class _ScanFrameState extends State<ScanFrame> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) => IgnorePointer(
-        child: Center(
-          child: SizedBox(
-            width: 240,
-            height: 240,
-            child: Stack(children: [
-              for (final a in const [Alignment.topLeft, Alignment.topRight, Alignment.bottomLeft, Alignment.bottomRight])
-                Align(alignment: a, child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _CornerPainter(a)))),
-              AnimatedBuilder(
-                animation: c,
-                builder: (_, __) => Align(
-                  alignment: Alignment(0, -1 + 2 * c.value),
-                  child: Container(
-                    height: 3,
-                    margin: const EdgeInsets.symmetric(horizontal: 14),
-                    decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
+        child: LayoutBuilder(builder: (_, box) {
+          final side = (box.biggest.shortestSide * 0.66).clamp(180.0, 300.0);
+          final st = widget.state;
+          final color = st == ScanState.success ? kOk : st == ScanState.error ? kDanger : Colors.white;
+          return Stack(children: [
+            Positioned.fill(child: CustomPaint(painter: _ScrimPainter(side))),
+            Center(
+              child: SizedBox(
+                width: side,
+                height: side,
+                child: Stack(children: [
+                  for (final a in const [Alignment.topLeft, Alignment.topRight, Alignment.bottomLeft, Alignment.bottomRight])
+                    Align(alignment: a, child: SizedBox(width: 40, height: 40, child: CustomPaint(painter: _CornerPainter(a, color)))),
+                  if (st == ScanState.idle)
+                    AnimatedBuilder(
+                      animation: c,
+                      builder: (_, __) => Align(
+                        alignment: Alignment(0, -1 + 2 * c.value),
+                        child: Container(
+                          height: 3,
+                          margin: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(2), boxShadow: [BoxShadow(color: kAccent.withOpacity(0.7), blurRadius: 10)]),
+                        ),
+                      ),
+                    )
+                  else
+                    Center(
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0.4, end: 1),
+                        duration: const Duration(milliseconds: 280),
+                        curve: Curves.easeOutBack,
+                        builder: (_, v, ch) => Transform.scale(scale: v, child: ch),
+                        child: Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          child: Icon(st == ScanState.success ? Icons.check_rounded : Icons.close_rounded, color: Colors.white, size: 44),
+                        ),
+                      ),
+                    ),
+                ]),
               ),
-            ]),
-          ),
-        ),
+            ),
+          ]);
+        }),
       );
 }
 
-/// Coin jaune du cadre de scan (repère du logo).
+/// Assombrit tout sauf le carré de scan.
+class _ScrimPainter extends CustomPainter {
+  final double side;
+  _ScrimPainter(this.side);
+  @override
+  bool shouldRepaint(_ScrimPainter o) => o.side != side;
+  @override
+  void paint(Canvas c, Size s) {
+    final hole = RRect.fromRectAndRadius(Rect.fromCenter(center: s.center(Offset.zero), width: side, height: side), const Radius.circular(28));
+    final path = Path()
+      ..fillType = PathFillType.evenOdd
+      ..addRect(Offset.zero & s)
+      ..addRRect(hole);
+    c.drawPath(path, Paint()..color = Colors.black.withOpacity(0.5));
+  }
+}
+
+/// Coin du cadre de scan.
 class _CornerPainter extends CustomPainter {
   final Alignment a;
-  _CornerPainter(this.a);
+  final Color color;
+  _CornerPainter(this.a, this.color);
   @override
-  bool shouldRepaint(_CornerPainter o) => false;
+  bool shouldRepaint(_CornerPainter o) => o.color != color;
   @override
   void paint(Canvas c, Size s) {
     final p = Paint()
-      ..color = Colors.white
+      ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
     final dx = a.x < 0 ? 1.0 : -1.0, dy = a.y < 0 ? 1.0 : -1.0;
     final ox = a.x < 0 ? 2.0 : s.width - 2, oy = a.y < 0 ? 2.0 : s.height - 2;
@@ -105,9 +151,13 @@ class _ScannerTabState extends State<ScannerTab> {
   final controller = MobileScannerController(detectionSpeed: DetectionSpeed.noDuplicates);
   final manual = TextEditingController();
   bool busy = false, torch = false;
+  ScanState scanState = ScanState.idle;
+  String? flashMsg; // message d'erreur non bloquant, affiché sur la caméra
+  Timer? flashTimer;
+  double zoom = 0;
 
   @override
-  void dispose() { controller.dispose(); manual.dispose(); super.dispose(); }
+  void dispose() { flashTimer?.cancel(); controller.dispose(); manual.dispose(); super.dispose(); }
 
   Future<void> _handle(String raw) async {
     if (busy || raw.trim().isEmpty) return;
@@ -115,38 +165,61 @@ class _ScannerTabState extends State<ScannerTab> {
     try {
       final r = await store.scan(raw);
       if (!mounted) return;
+      // Retour visuel immédiat : le cadre passe au vert avant l'ouverture de la fiche.
+      store.buzz();
+      setState(() { scanState = ScanState.success; flashMsg = null; });
+      await Future.delayed(const Duration(milliseconds: 450));
+      if (!mounted) return;
       // Pop-up « quelle offre le client utilise-t-il ? » (réglable dans Paramètres)
       if (store.offerAsk == 'scan') {
-        store.buzz();
         await pickOfferForScan(context, r);
         if (!mounted) return;
       }
       await _success(r);
     } catch (e) {
-      if (mounted) await _error(errText(e));
+      if (mounted) _error(errText(e));
     }
+    if (mounted) setState(() => scanState = ScanState.idle);
     await Future.delayed(const Duration(milliseconds: 600));
     busy = false;
   }
 
-  Future<void> _error(String msg) {
+  /// Erreur : le cadre devient rouge et un message s'affiche 3 s sur la caméra (sans fenêtre bloquante).
+  void _error(String msg) {
     store.buzz(heavy: true);
-    return showDialog(
-      context: context,
-      builder: (d) {
-        Timer(const Duration(milliseconds: 3000), () { if (d.mounted && Navigator.of(d).canPop()) Navigator.of(d).pop(); });
-        return AlertDialog(icon: const Icon(Icons.error_rounded, color: kDanger, size: 64), content: Text(msg, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)));
-      },
-    );
+    flashTimer?.cancel();
+    setState(() { scanState = ScanState.error; flashMsg = msg; });
+    flashTimer = Timer(const Duration(milliseconds: 3200), () { if (mounted) setState(() { flashMsg = null; scanState = ScanState.idle; }); });
   }
 
   Future<void> _success(Map<String, dynamic> r) {
-    store.buzz();
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => _ScanResultSheet(r),
+    );
+  }
+
+  Widget _round(IconData i, VoidCallback onTap, {bool active = false}) => Material(
+        color: active ? kAccent : Colors.black54,
+        shape: const CircleBorder(),
+        child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Padding(padding: const EdgeInsets.all(10), child: Icon(i, size: 22, color: active ? kInk : Colors.white))),
+      );
+
+  Widget _cameraError(MobileScannerException e) {
+    final denied = e.errorCode == MobileScannerErrorCode.permissionDenied;
+    return Container(
+      color: Colors.black,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.all(24),
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(denied ? Icons.no_photography_rounded : Icons.videocam_off_rounded, color: Colors.white70, size: 48),
+        const SizedBox(height: 12),
+        Text(denied ? tr('Accès à la caméra refusé. Autorisez-le dans les réglages du téléphone.', 'تم رفض الوصول إلى الكاميرا. اسمح به من إعدادات الهاتف.') : '${tr('Caméra', 'الكاميرا')} : ${e.errorCode.name}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 15)),
+        const SizedBox(height: 14),
+        FilledButton(onPressed: () => controller.start(), child: Text(tr('Réessayer', 'إعادة المحاولة'))),
+      ]),
     );
   }
 
@@ -182,36 +255,67 @@ class _ScannerTabState extends State<ScannerTab> {
                 child: Stack(children: [
                   MobileScanner(
                     controller: controller,
-                    errorBuilder: (c, e) => Container(color: Colors.black, alignment: Alignment.center, padding: const EdgeInsets.all(24), child: Text('${tr('Caméra', 'الكاميرا')} : ${e.errorCode.name}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 18))),
+                    errorBuilder: (c, e) => _cameraError(e),
                     onDetect: (cap) {
                       final v = cap.barcodes.firstOrNull?.rawValue;
                       if (v != null) _handle(v);
                     },
                   ),
-                  const ScanFrame(),
+                  ScanFrame(state: scanState),
+                  // Message : consigne, ou erreur du dernier scan
                   Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Column(children: [
-                      IconButton.filled(
-                        icon: Icon(torch ? Icons.flashlight_off_rounded : Icons.flashlight_on_rounded),
-                        onPressed: () { controller.toggleTorch(); setState(() => torch = !torch); },
-                      ),
-                      const SizedBox(height: 6),
-                      IconButton.filled(icon: const NIcon(NI.camera), onPressed: () => controller.switchCamera()),
-                    ]),
-                  ),
-                  Positioned(
-                    bottom: 14,
-                    left: 0,
-                    right: 0,
+                    top: 14,
+                    left: 14,
+                    right: 14,
                     child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20)),
-                        child: Text(tr('Placez le QR du client dans le cadre', 'ضع رمز الزبون داخل الإطار'), style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 200),
+                        child: Container(
+                          key: ValueKey(flashMsg),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(color: flashMsg != null ? kDanger : Colors.black54, borderRadius: BorderRadius.circular(20)),
+                          child: Text(
+                            flashMsg ?? tr('Placez le QR du client dans le cadre', 'ضع رمز الزبون داخل الإطار'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
                       ),
                     ),
+                  ),
+                  // Commandes : lampe · zoom · changer de caméra
+                  Positioned(
+                    bottom: 12,
+                    left: 12,
+                    right: 12,
+                    child: Row(children: [
+                      _round(torch ? Icons.flashlight_off_rounded : Icons.flashlight_on_rounded, () { controller.toggleTorch(); setState(() => torch = !torch); }, active: torch),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(30)),
+                          child: Row(children: [
+                            const Icon(Icons.zoom_out_rounded, color: Colors.white70, size: 20),
+                            Expanded(
+                              child: SliderTheme(
+                                data: SliderTheme.of(context).copyWith(activeTrackColor: kAccent, inactiveTrackColor: Colors.white24, thumbColor: kAccent, overlayColor: Colors.transparent, trackHeight: 3),
+                                child: Slider(
+                                  value: zoom,
+                                  onChanged: (v) {
+                                    setState(() => zoom = v);
+                                    controller.setZoomScale(v).catchError((_) {});
+                                  },
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.zoom_in_rounded, color: Colors.white70, size: 20),
+                          ]),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      _round(Icons.cameraswitch_rounded, () => controller.switchCamera()),
+                    ]),
                   ),
                 ]),
               ),
