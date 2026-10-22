@@ -5,7 +5,7 @@ import 'icons.dart';
 import 'ui.dart';
 import 'settings_page.dart';
 
-const appVersion = '0.6.0';
+const appVersion = '0.8.0';
 
 /// Onglet « Profil » : identité, code personnel, accès aux Paramètres.
 class ProfileTab extends StatelessWidget {
@@ -97,7 +97,9 @@ class ProfileTab extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())),
               ),
-              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: store.signOut),
+              ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.logout), title: Text(tr('Se déconnecter', 'تسجيل الخروج')), onTap: () async {
+                if (await confirmAction(context, title: tr('Se déconnecter ?', 'تسجيل الخروج؟'), body: tr('Vous devrez vous reconnecter pour scanner vos clients.', 'ستحتاج إلى تسجيل الدخول مجددًا لمسح زبائنك.'), confirm: tr('Se déconnecter', 'خروج'))) store.signOut();
+              }),
             ]),
             const SizedBox(height: 16),
             const Center(child: Text('Nqata Pro $appVersion', style: TextStyle(color: kMuted))),
