@@ -204,7 +204,7 @@ class _ScannerTabState extends State<ScannerTab> {
   Widget _round(IconData i, VoidCallback onTap, {bool active = false}) => Material(
         color: active ? kAccent : Colors.black54,
         shape: const CircleBorder(),
-        child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Padding(padding: const EdgeInsets.all(10), child: Icon(i, size: 22, color: active ? kInk : Colors.white))),
+        child: InkWell(customBorder: const CircleBorder(), onTap: onTap, child: Padding(padding: const EdgeInsets.all(13), child: Icon(i, size: 22, color: active ? kInk : Colors.white))),
       );
 
   Widget _cameraError(MobileScannerException e) {
