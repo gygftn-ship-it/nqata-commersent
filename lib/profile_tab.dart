@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'icons.dart';
 import 'ui.dart';
 import 'settings_page.dart';
 
-const appVersion = '0.5.0';
+const appVersion = '0.6.0';
 
 /// Onglet « Profil » : identité, code personnel, accès aux Paramètres.
 class ProfileTab extends StatelessWidget {
@@ -89,23 +88,12 @@ class ProfileTab extends StatelessWidget {
               ),
             ],
             body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 24), children: [
-            SectionCard(title: tr('Mon code', 'رمزي'), icon: NI.badge, children: [
-              Row(children: [
-                Expanded(child: SelectableText(store.myCode.isEmpty ? '—' : store.myCode, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: 2))),
-                IconButton.filledTonal(
-                  icon: const NIcon(NI.copy),
-                  onPressed: store.myCode.isEmpty ? null : () { Clipboard.setData(ClipboardData(text: store.myCode)); snack(context, tr('Code copié', 'تم نسخ الرمز')); },
-                ),
-              ]),
-              const SizedBox(height: 4),
-              Text(tr('Donnez ce code au propriétaire d\'un commerce pour rejoindre son équipe.', 'أعطِ هذا الرمز لمالك المتجر للانضمام إلى فريقه.'), style: const TextStyle(fontSize: 12, color: kMuted)),
-            ]),
             SectionCard(title: tr('Mon compte', 'حسابي'), icon: NI.lock, children: [
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.settings_rounded),
                 title: Text(tr('Paramètres', 'الإعدادات'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                subtitle: Text(tr('Langue, apparence, mot de passe', 'اللغة، المظهر، كلمة السر')),
+                subtitle: Text(tr('Langue, offres, scanner, mot de passe', 'اللغة، العروض، المسح، كلمة السر')),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsPage())),
               ),
