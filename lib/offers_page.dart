@@ -51,7 +51,7 @@ Future<bool> validateWithOffer(BuildContext context, String clientId, String cli
           ? tr('Récompense validée', 'تم تأكيد المكافأة')
           : saved
               ? '${tr('Offre validée', 'تم تأكيد العرض')} : ${res.offer!['title']}'
-              : tr('Récompense validée, mais l\'offre n\'a pas pu être enregistrée (appliquez supabase_offer_tracking.sql)', 'تم تأكيد المكافأة لكن تعذّر تسجيل العرض (طبّق supabase_offer_tracking.sql)')),
+              : tr('Récompense validée, mais l\'offre n\'a pas pu être enregistrée (${store.errors['offerLog'] ?? '?'})', 'تم تأكيد المكافأة لكن تعذّر تسجيل العرض (${store.errors['offerLog'] ?? '?'})')),
     ));
     return true;
   } catch (e) {
@@ -83,7 +83,7 @@ Future<void> pickOfferForScan(BuildContext context, Map<String, dynamic> r) asyn
   m.showSnackBar(SnackBar(
     content: Text(saved
         ? '${tr('Offre validée', 'تم تأكيد العرض')} : ${res.offer!['title']}'
-        : tr('L\'offre n\'a pas pu être enregistrée (appliquez supabase_offer_tracking.sql)', 'تعذّر تسجيل العرض (طبّق supabase_offer_tracking.sql)')),
+        : tr('L\'offre n\'a pas pu être enregistrée (${store.errors['offerLog'] ?? '?'})', 'تعذّر تسجيل العرض (${store.errors['offerLog'] ?? '?'})')),
   ));
 }
 
