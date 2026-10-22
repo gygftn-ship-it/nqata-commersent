@@ -585,6 +585,8 @@ class NqataPro extends StatelessWidget {
     OutlineInputBorder ob(Color c, [double w = 1]) => OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: c, width: w));
     return ThemeData(
       useMaterial3: true,
+      splashFactory: InkSparkle.splashFactory,
+      pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: CupertinoPageTransitionsBuilder(), TargetPlatform.iOS: CupertinoPageTransitionsBuilder()}),
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
       dividerColor: hair,
@@ -611,10 +613,11 @@ class NqataPro extends StatelessWidget {
       ),
       segmentedButtonTheme: SegmentedButtonThemeData(
         style: ButtonStyle(
-          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : card),
+          backgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kAccent : bg),
           foregroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? kInk : fg),
-          side: const WidgetStatePropertyAll(BorderSide.none),
+          side: WidgetStatePropertyAll(BorderSide(color: scheme.outline)),
           shape: const WidgetStatePropertyAll(StadiumBorder()),
+          visualDensity: VisualDensity.standard,
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(backgroundColor: card, surfaceTintColor: Colors.transparent, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32)))),
@@ -631,7 +634,7 @@ class NqataPro extends StatelessWidget {
 
   Widget _home() {
     if (!store.loggedIn) return const LoginPage();
-    if (!store.loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    if (!store.loaded) return const SplashPage();
     if (store.loadError != null) return const InfoPage(kind: 'error');
     if (store.shop == null) {
       if (store.onboardMode == 'owner') return const RegisterShopPage();
@@ -651,7 +654,18 @@ class NqataPro extends StatelessWidget {
           theme: _theme(Brightness.light),
           darkTheme: _theme(Brightness.dark),
           themeMode: store.themeMode,
-          builder: (c, child) => Directionality(textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr, child: child!),
+          builder: (c, child) {
+            final mq = MediaQuery.of(c);
+            return MediaQuery(
+              // Polices système très grandes : on borne pour éviter les textes coupés.
+              data: mq.copyWith(textScaler: mq.textScaler.clamp(minScaleFactor: 0.9, maxScaleFactor: 1.25)),
+              child: Directionality(
+                textDirection: lang == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+                // Toucher en dehors d'un champ ferme le clavier.
+                child: GestureDetector(behavior: HitTestBehavior.translucent, onTap: () => FocusManager.instance.primaryFocus?.unfocus(), child: child!),
+              ),
+            );
+          },
           home: _home(),
         ),
       );
@@ -896,6 +910,15 @@ class InfoPage extends StatelessWidget {
   final String kind;
   const InfoPage({super.key, required this.kind});
 
+  Widget _step(bool done, String t) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(children: [
+          Icon(done ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, color: done ? kOk : kMuted, size: 24),
+          const SizedBox(width: 12),
+          Expanded(child: Text(t, style: TextStyle(fontSize: 15, fontWeight: done ? FontWeight.w700 : FontWeight.w500, color: done ? null : kMuted))),
+        ]),
+      );
+
   @override
   Widget build(BuildContext context) {
     final pending = kind == 'pending';
@@ -903,24 +926,41 @@ class InfoPage extends StatelessWidget {
       body: NqScreen(
         title: 'Nqata Pro',
         action: HeaderPill(icon: Icons.logout_rounded, label: tr('Quitter', 'خروج'), onTap: store.signOut),
-        body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(mainAxisSize: MainAxisSize.min, children: [
-            Icon(pending ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded, size: 72, color: pending ? kWarn : kMuted),
-            const SizedBox(height: 16),
-            Text(
-              pending ? tr('Commerce en attente de validation', 'المتجر بانتظار الموافقة') : (store.loadError ?? ''),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.titleMedium,
+        body: ListView(padding: const EdgeInsets.fromLTRB(28, 32, 28, 28), children: [
+          Center(
+            child: Container(
+              width: 112,
+              height: 112,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: (pending ? kAccent : kDanger).withOpacity(0.2)),
+              child: Icon(pending ? Icons.hourglass_top_rounded : Icons.wifi_off_rounded, size: 52, color: pending ? kWarn : kDanger),
             ),
-            const SizedBox(height: 8),
-            if (pending) Text('${store.shop?['name'] ?? ''}', style: const TextStyle(color: kMuted)),
-            const SizedBox(height: 16),
-            FilledButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
-          ]),
-        ),
-      ),
+          ),
+          const SizedBox(height: 22),
+          Text(pending ? tr('Demande en cours de validation', 'الطلب قيد المراجعة') : tr('Connexion impossible', 'تعذّر الاتصال'), textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, height: 1.15)),
+          const SizedBox(height: 8),
+          Text(
+            pending
+                ? tr('L\'équipe Nqata vérifie « ${store.shop?['name'] ?? ''} ». Une fois validé, touchez « Actualiser » : l\'application s\'ouvrira.', 'يراجع فريق نقطة «${store.shop?['name'] ?? ''}». بعد الموافقة اضغط «تحديث» ليفتح التطبيق.')
+                : (store.loadError ?? ''),
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: kMuted, fontSize: 15, height: 1.4),
+          ),
+          if (pending) ...[
+            const SizedBox(height: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+              decoration: BoxDecoration(color: cardColor(context), borderRadius: BorderRadius.circular(24)),
+              child: Column(children: [
+                _step(true, tr('Compte créé', 'تم إنشاء الحساب')),
+                _step(true, tr('Commerce envoyé', 'تم إرسال المتجر')),
+                _step(false, tr('Validation par l\'équipe Nqata', 'موافقة فريق نقطة')),
+                _step(false, tr('Accès à l\'application', 'الدخول إلى التطبيق')),
+              ]),
+            ),
+          ],
+          const SizedBox(height: 26),
+          FilledButton.icon(icon: const Icon(Icons.refresh_rounded), onPressed: store.refresh, label: Text(tr('Actualiser', 'تحديث'))),
+        ]),
       ),
     );
   }
