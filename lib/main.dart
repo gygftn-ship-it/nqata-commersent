@@ -1,8 +1,10 @@
 import 'dart:typed_data';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'local_store.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
+import 'team_pages.dart';
 import 'icons.dart';
 import 'ui.dart';
 
@@ -41,6 +43,10 @@ String errText(Object e) {
     'not_enough_points': ['Points insuffisants', 'نقاط غير كافية'],
     'user_not_found': ['Aucun compte avec ce code', 'لا يوجد حساب بهذا الرمز'],
     'bad_role': ['Rôle invalide', 'دور غير صالح'],
+    'invite_invalid': ['QR d\'invitation invalide ou introuvable', 'رمز الدعوة غير صالح'],
+    'invite_used': ['Ce QR a déjà été utilisé : demandez-en un nouveau au gérant', 'تم استعمال هذا الرمز: اطلب رمزًا جديدًا من المدير'],
+    'invite_expired': ['Ce QR a expiré : demandez-en un nouveau au gérant', 'انتهت صلاحية الرمز: اطلب رمزًا جديدًا من المدير'],
+    'already_in_shop': ['Vous faites déjà partie d\'une équipe', 'أنت ضمن فريق بالفعل'],
     'bad_amount': ['Montant invalide', 'مبلغ غير صالح'],
     'confirm_email': ['Compte créé : confirmez votre e-mail puis connectez-vous', 'تم إنشاء الحساب: أكّد بريدك ثم سجّل الدخول'],
     'Invalid login credentials': ['E-mail ou mot de passe incorrect', 'بريد أو كلمة سر خاطئة'],
@@ -68,6 +74,35 @@ class Store extends ChangeNotifier {
   // Offres enrichies (description, type, valeur, pause) : disponibles seulement si la migration SQL a été appliquée.
   bool offersExt = true;
   Map<String, int> offerUses = {}; // offre -> nombre de validations
+  List<Map<String, dynamic>> invites = [], offerLog = []; // invitations d'équipe en attente · historique des offres validées
+  List<Map<String, dynamic>> reviews = []; // avis clients (table shop_reviews)
+  String? onboardMode; // après inscription sans commerce : null (choix) · 'owner' · 'employee'
+
+  // ----- Réglages locaux (propres à cet appareil) -----
+  String offerAsk = 'scan'; // quand demander l'offre : 'scan' (à chaque scan) · 'reward' (récompense seulement) · 'never'
+  bool offerAllowNone = true, askAmount = false, haptics = true;
+  int autoCloseSecs = 8; // fermeture auto du résultat de scan (0 = jamais)
+
+  void loadPrefs() {
+    final a = FileStore.get('offerAsk');
+    offerAsk = (a == 'reward' || a == 'never') ? a! : 'scan';
+    offerAllowNone = FileStore.get('offerAllowNone') != 'false';
+    askAmount = FileStore.get('askAmount') == 'true';
+    haptics = FileStore.get('haptics') != 'false';
+    autoCloseSecs = int.tryParse(FileStore.get('autoCloseSecs') ?? '') ?? 8;
+  }
+
+  void setOfferAsk(String v) { offerAsk = v; FileStore.set('offerAsk', v); notifyListeners(); }
+  void setOfferAllowNone(bool v) { offerAllowNone = v; FileStore.set('offerAllowNone', '$v'); notifyListeners(); }
+  void setAskAmount(bool v) { askAmount = v; FileStore.set('askAmount', '$v'); notifyListeners(); }
+  void setHaptics(bool v) { haptics = v; FileStore.set('haptics', '$v'); notifyListeners(); }
+  void setAutoClose(int s) { autoCloseSecs = s; FileStore.set('autoCloseSecs', '$s'); notifyListeners(); }
+  void buzz({bool heavy = false}) {
+    if (!haptics) return;
+    heavy ? HapticFeedback.heavyImpact() : HapticFeedback.mediumImpact();
+  }
+
+  void setOnboardMode(String? m) { onboardMode = m; notifyListeners(); }
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
@@ -178,8 +213,10 @@ class Store extends ChangeNotifier {
     if (shop != null && active) {
       try {
         rating = await sb.from('shop_ratings').select('avg_rating, reviews_count').eq('shop_id', shopId).maybeSingle();
-      } catch (_) {
+        errors.remove('rating');
+      } catch (e) {
         rating = null;
+        errors['rating'] = _raw(e); // visible dans l'onglet Commerce
       }
       final t = DateTime.now();
       final start = DateTime(t.year, t.month, t.day).toUtc().toIso8601String();
@@ -189,8 +226,9 @@ class Store extends ChangeNotifier {
         _loadOffers(),
         _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start), 'redeems'),
         manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId), 'team') : Future.value(<Map<String, dynamic>>[]),
+        manager ? _q(sb.rpc('list_staff_invites', params: {'p_shop': shopId}), 'invites') : Future.value(<Map<String, dynamic>>[]),
       ]);
-      clients = r[0]; scans = r[1]; offers = r[2]; redeems = r[3]; team = r[4];
+      clients = r[0]; scans = r[1]; offers = r[2]; redeems = r[3]; team = r[4]; invites = r[5];
       await _loadOfferUses();
       historyStale = true;
     }
@@ -210,7 +248,8 @@ class Store extends ChangeNotifier {
     await start();
   }
 
-  Future<void> signUp(String e, String p, String n) async {
+  Future<void> signUp(String e, String p, String n, {String? mode}) async {
+    onboardMode = mode;
     final r = await sb.auth.signUp(email: e, password: p, data: {'display_name': n.isEmpty ? 'Commerçant' : n});
     if (r.session == null) throw 'confirm_email';
     await start();
@@ -220,6 +259,7 @@ class Store extends ChangeNotifier {
     try { await sb.auth.signOut(); } catch (_) {}
     loggedIn = false; loaded = false; shop = null; clients = []; scans = []; offers = []; redeems = []; team = [];
     history = []; redeemHistory = []; historyLoaded = false; historyStale = true; offerUses = {};
+    invites = []; offerLog = []; reviews = []; onboardMode = null;
     notifyListeners();
   }
 
@@ -262,14 +302,69 @@ class Store extends ChangeNotifier {
   }
 
   /// Valide la récompense d'un client. `offer` = l'offre choisie (null = récompense de fidélité standard).
-  Future<void> redeem(String clientId, {Map<String, dynamic>? offer}) async {
+  /// Retourne false si l'offre choisie n'a pas pu être enregistrée (migration SQL manquante).
+  Future<bool> redeem(String clientId, {Map<String, dynamic>? offer}) async {
     await sb.rpc('redeem_reward', params: {'p_shop': shopId, 'p_client': clientId});
-    if (offer != null) {
-      try {
-        await sb.from('offer_redemptions').insert({'shop_id': shopId, 'offer_id': offer['id'], 'client_id': clientId});
-      } catch (_) {} // table absente tant que la migration SQL n'est pas appliquée
-    }
+    var saved = true;
+    if (offer != null) saved = await recordOffer(clientId, offer, source: 'reward');
     await refresh();
+    return saved;
+  }
+
+  /// Enregistre quelle offre a été utilisée par un client (lors d'un scan ou d'une récompense).
+  /// Essaie d'abord la forme complète (scan, employé, titre), puis la forme simple si la migration SQL n'est pas appliquée.
+  Future<bool> recordOffer(String clientId, Map<String, dynamic> offer, {String? scanId, String source = 'scan'}) async {
+    final base = {'shop_id': shopId, 'offer_id': offer['id'], 'client_id': clientId};
+    try {
+      await sb.from('offer_redemptions').insert({...base, if (scanId != null) 'scan_id': scanId, 'staff_id': uid, 'offer_title': offer['title'], 'source': source});
+    } catch (_) {
+      try {
+        await sb.from('offer_redemptions').insert(base);
+      } catch (e) {
+        errors['offerLog'] = _raw(e);
+        return false;
+      }
+    }
+    errors.remove('offerLog');
+    await _loadOfferUses();
+    notifyListeners();
+    return true;
+  }
+
+  /// Avis clients du commerce (200 derniers). `select()` sans liste de colonnes : on lit ce que la table contient.
+  Future<void> loadReviews() async {
+    try {
+      List<dynamic> rows;
+      try {
+        rows = await sb.from('shop_reviews').select().eq('shop_id', shopId).order('created_at', ascending: false).limit(200);
+      } catch (_) {
+        rows = await sb.from('shop_reviews').select().eq('shop_id', shopId).limit(200); // pas de colonne created_at
+      }
+      reviews = List<Map<String, dynamic>>.from(rows);
+      errors.remove('reviews');
+    } catch (e) {
+      reviews = [];
+      errors['reviews'] = _raw(e);
+    }
+    notifyListeners();
+  }
+
+  /// Historique des offres validées (200 dernières).
+  Future<void> loadOfferLog() async {
+    for (final cols in const ['id, offer_id, client_id, staff_id, offer_title, source, created_at', 'id, offer_id, client_id, created_at', 'offer_id, client_id']) {
+      try {
+        final q = sb.from('offer_redemptions').select(cols).eq('shop_id', shopId);
+        final rows = cols.contains('created_at') ? await q.order('created_at', ascending: false).limit(200) : await q.limit(200);
+        offerLog = List<Map<String, dynamic>>.from(rows);
+        errors.remove('offerLog');
+        notifyListeners();
+        return;
+      } catch (e) {
+        errors['offerLog'] = _raw(e);
+      }
+    }
+    offerLog = [];
+    notifyListeners();
   }
 
   Future<List<Map<String, dynamic>>> _loadOffers() async {
@@ -288,7 +383,10 @@ class Store extends ChangeNotifier {
     try {
       final rows = List<Map<String, dynamic>>.from(await sb.from('offer_redemptions').select('offer_id').eq('shop_id', shopId));
       final m = <String, int>{};
-      for (final r in rows) { m['${r['offer_id']}'] = (m['${r['offer_id']}'] ?? 0) + 1; }
+      for (final r in rows) {
+        if (r['offer_id'] == null) continue;
+        m['${r['offer_id']}'] = (m['${r['offer_id']}'] ?? 0) + 1;
+      }
       offerUses = m;
     } catch (_) {
       offerUses = {};
@@ -387,8 +485,25 @@ class Store extends ChangeNotifier {
     await sb.auth.updateUser(UserAttributes(password: p));
   }
 
-  Future<void> addStaff(String code, String role) async {
-    await sb.rpc('owner_add_staff', params: {'p_shop': shopId, 'p_code': code, 'p_role': role});
+  /// Génère un QR d'invitation unique (à usage unique) pour un futur membre de l'équipe.
+  Future<Map<String, dynamic>> createInvite(String role, String label) async {
+    final r = await sb.rpc('create_staff_invite', params: {'p_shop': shopId, 'p_role': role, 'p_label': label.isEmpty ? null : label});
+    final inv = Map<String, dynamic>.from(r is List ? r.first as Map : r as Map);
+    invites = await _q(sb.rpc('list_staff_invites', params: {'p_shop': shopId}), 'invites');
+    notifyListeners();
+    return inv;
+  }
+
+  Future<void> revokeInvite(String id) async {
+    await sb.rpc('revoke_staff_invite', params: {'p_invite': id});
+    invites = invites.where((i) => '${i['id']}' != id).toList();
+    notifyListeners();
+  }
+
+  /// Côté employé : rejoint l'équipe en scannant le QR du gérant.
+  Future<void> joinWithInvite(String token) async {
+    await sb.rpc('join_shop_with_invite', params: {'p_token': token});
+    onboardMode = null;
     await refresh();
   }
 
@@ -418,6 +533,7 @@ Future<void> main() async {
   try {
     await FileStore.init();
     lang = FileStore.get('lang') ?? 'fr';
+    store.loadPrefs();
     store.themeMode = switch (FileStore.get('theme')) { 'light' => ThemeMode.light, 'dark' => ThemeMode.dark, _ => ThemeMode.light };
     await Supabase.initialize(
       url: supabaseUrl,
@@ -516,7 +632,11 @@ class NqataPro extends StatelessWidget {
     if (!store.loggedIn) return const LoginPage();
     if (!store.loaded) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     if (store.loadError != null) return const InfoPage(kind: 'error');
-    if (store.shop == null) return const RegisterShopPage();
+    if (store.shop == null) {
+      if (store.onboardMode == 'owner') return const RegisterShopPage();
+      if (store.onboardMode == 'employee') return const JoinTeamPage();
+      return const OnboardingPage();
+    }
     if (!store.active) return const InfoPage(kind: 'pending');
     return const Shell();
   }
@@ -546,6 +666,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final name = TextEditingController(), email = TextEditingController(), pass = TextEditingController();
   bool signup = false, busy = false;
+  String role = 'owner'; // à l'inscription : 'owner' (gérant) ou 'employee' (rejoint une équipe)
   String? error;
 
   @override
@@ -555,7 +676,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() { busy = true; error = null; });
     try {
       final e = email.text.trim();
-      signup ? await store.signUp(e, pass.text, name.text.trim()) : await store.signIn(e, pass.text);
+      signup ? await store.signUp(e, pass.text, name.text.trim(), mode: role) : await store.signIn(e, pass.text);
     } catch (err) {
       if (mounted) setState(() => error = errText(err));
     }
@@ -578,7 +699,30 @@ class _LoginPageState extends State<LoginPage> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 420),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  if (signup) _f(name, tr('Votre prénom', 'اسمك')),
+                  if (signup) ...[
+                    Text(tr('Vous êtes…', 'أنت…'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<String>(
+                        segments: [
+                          ButtonSegment(value: 'owner', icon: const Icon(Icons.storefront_rounded), label: Text(tr('Gérant', 'مدير'))),
+                          ButtonSegment(value: 'employee', icon: const Icon(Icons.badge_rounded), label: Text(tr('Employé', 'موظف'))),
+                        ],
+                        selected: {role},
+                        onSelectionChanged: (s) => setState(() => role = s.first),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      role == 'owner'
+                          ? tr('Vous enregistrez votre commerce.', 'ستسجّل متجرك.')
+                          : tr('Vous rejoindrez une équipe en scannant le QR code donné par votre gérant.', 'ستنضم إلى فريق بمسح رمز QR الذي يعطيه لك مديرك.'),
+                      style: const TextStyle(fontSize: 12.5, color: kMuted),
+                    ),
+                    const SizedBox(height: 14),
+                    _f(name, tr('Votre prénom', 'اسمك')),
+                  ],
                   _f(email, 'E-mail', type: TextInputType.emailAddress),
                   _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
                   if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
@@ -592,6 +736,12 @@ class _LoginPageState extends State<LoginPage> {
                     onPressed: () => setState(() { signup = !signup; error = null; }),
                     child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
                   ),
+                  if (!signup)
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.qr_code_scanner_rounded),
+                      label: Text(tr('Rejoindre une équipe (scanner un QR)', 'الانضمام إلى فريق (مسح رمز QR)')),
+                      onPressed: () => setState(() { signup = true; role = 'employee'; error = null; }),
+                    ),
                 ]),
               ),
             ),
@@ -636,7 +786,7 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
   Widget build(BuildContext context) => Scaffold(
         body: NqScreen(
           title: tr('Mon commerce', 'متجري'),
-          action: HeaderPill(icon: Icons.logout_rounded, label: tr('Quitter', 'خروج'), onTap: store.signOut),
+          action: HeaderPill(icon: Icons.arrow_back_rounded, label: tr('Retour', 'رجوع'), onTap: () => store.setOnboardMode(null)),
           body: ListView(padding: const EdgeInsets.all(24), children: [
           Text(tr('Bienvenue ! Décrivez votre commerce. L\'équipe Nqata le validera avant l\'activation.', 'مرحبًا! صف متجرك. سيقوم فريق نقطة بالموافقة عليه قبل التفعيل.')),
           const SizedBox(height: 16),
@@ -650,8 +800,7 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
           if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
           FilledButton(onPressed: busy ? null : _go, child: Text(tr('Envoyer ma demande', 'إرسال الطلب'))),
           const SizedBox(height: 8),
-          Text(tr('Vous faites partie de l\'équipe d\'un commerce ? Donnez votre code au propriétaire : ${store.myCode}', 'أنت ضمن فريق متجر؟ أعطِ رمزك للمالك: ${store.myCode}'), style: const TextStyle(color: kMuted)),
-          TextButton(onPressed: store.refresh, child: Text(tr('Actualiser', 'تحديث'))),
+          TextButton(onPressed: () => store.setOnboardMode('employee'), child: Text(tr('Je suis employé : rejoindre une équipe', 'أنا موظف: الانضمام إلى فريق'))),
         ]),
         ),
       );
