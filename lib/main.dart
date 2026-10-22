@@ -65,6 +65,9 @@ class Store extends ChangeNotifier {
   List<Map<String, dynamic>> history = [], redeemHistory = [];
   final errors = <String, String>{}; // dernière erreur de lecture par source (clients, scans...)
   bool hasAmount = true, historyLoaded = false, historyStale = true, historyLoading = false;
+  // Offres enrichies (description, type, valeur, pause) : disponibles seulement si la migration SQL a été appliquée.
+  bool offersExt = true;
+  Map<String, int> offerUses = {}; // offre -> nombre de validations
 
   SupabaseClient get sb => Supabase.instance.client;
   String get uid => sb.auth.currentUser!.id;
@@ -183,11 +186,12 @@ class Store extends ChangeNotifier {
       final r = await Future.wait([
         _q(sb.from('shop_clients').select('client_id, display_name, points, last_scan_at').eq('shop_id', shopId).order('points', ascending: false), 'clients'),
         _todayScans(start),
-        _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(30), 'offers'),
+        _loadOffers(),
         _q(sb.from('redemptions').select('id, points_cost').eq('shop_id', shopId).gte('created_at', start), 'redeems'),
         manager ? _q(sb.from('shop_team').select('user_id, display_name, role').eq('shop_id', shopId), 'team') : Future.value(<Map<String, dynamic>>[]),
       ]);
       clients = r[0]; scans = r[1]; offers = r[2]; redeems = r[3]; team = r[4];
+      await _loadOfferUses();
       historyStale = true;
     }
     loaded = true;
@@ -215,7 +219,7 @@ class Store extends ChangeNotifier {
   Future<void> signOut() async {
     try { await sb.auth.signOut(); } catch (_) {}
     loggedIn = false; loaded = false; shop = null; clients = []; scans = []; offers = []; redeems = []; team = [];
-    history = []; redeemHistory = []; historyLoaded = false; historyStale = true;
+    history = []; redeemHistory = []; historyLoaded = false; historyStale = true; offerUses = {};
     notifyListeners();
   }
 
@@ -257,18 +261,68 @@ class Store extends ChangeNotifier {
     await refresh();
   }
 
-  Future<void> redeem(String clientId) async {
+  /// Valide la récompense d'un client. `offer` = l'offre choisie (null = récompense de fidélité standard).
+  Future<void> redeem(String clientId, {Map<String, dynamic>? offer}) async {
     await sb.rpc('redeem_reward', params: {'p_shop': shopId, 'p_client': clientId});
+    if (offer != null) {
+      try {
+        await sb.from('offer_redemptions').insert({'shop_id': shopId, 'offer_id': offer['id'], 'client_id': clientId});
+      } catch (_) {} // table absente tant que la migration SQL n'est pas appliquée
+    }
     await refresh();
   }
 
-  Future<void> sendOffer(String title, String audience, {int? days}) async {
-    await sb.from('offers').insert({
+  Future<List<Map<String, dynamic>>> _loadOffers() async {
+    try {
+      final r = await sb.from('offers').select('id, title, description, kind, value, audience, active, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(50);
+      offersExt = true;
+      errors.remove('offers');
+      return List<Map<String, dynamic>>.from(r);
+    } catch (_) {
+      offersExt = false;
+      return _q(sb.from('offers').select('id, title, audience, created_at, expires_at').eq('shop_id', shopId).order('created_at', ascending: false).limit(50), 'offers');
+    }
+  }
+
+  Future<void> _loadOfferUses() async {
+    try {
+      final rows = List<Map<String, dynamic>>.from(await sb.from('offer_redemptions').select('offer_id').eq('shop_id', shopId));
+      final m = <String, int>{};
+      for (final r in rows) { m['${r['offer_id']}'] = (m['${r['offer_id']}'] ?? 0) + 1; }
+      offerUses = m;
+    } catch (_) {
+      offerUses = {};
+    }
+  }
+
+  /// Une offre est « en cours » si elle n'est pas en pause et pas expirée.
+  bool offerLive(Map<String, dynamic> o) {
+    if (o['active'] == false) return false;
+    final e = o['expires_at'] as String?;
+    return e == null || DateTime.parse(e).toLocal().isAfter(DateTime.now());
+  }
+
+  Future<void> sendOffer(String title, String audience, {int? days, String? description, String kind = 'custom', num? value}) async {
+    final base = {
       'shop_id': shopId,
       'title': title,
       'audience': audience,
       if (days != null) 'expires_at': DateTime.now().add(Duration(days: days)).toUtc().toIso8601String(),
-    });
+    };
+    try {
+      await sb.from('offers').insert({
+        ...base,
+        if (offersExt) ...{'kind': kind, if (value != null) 'value': value, if (description != null && description.isNotEmpty) 'description': description},
+      });
+    } catch (_) {
+      // Migration SQL pas encore appliquée : on enregistre l'offre sous sa forme simple.
+      await sb.from('offers').insert(base);
+    }
+    await refresh();
+  }
+
+  Future<void> setOfferActive(String id, bool active) async {
+    await sb.from('offers').update({'active': active}).eq('id', id);
     await refresh();
   }
 
