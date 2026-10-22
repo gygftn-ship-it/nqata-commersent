@@ -71,13 +71,6 @@ Future<void> pickOfferForScan(BuildContext context, Map<String, dynamic> r) asyn
   );
   if (res == null || !context.mounted) return;
   final m = ScaffoldMessenger.of(context);
-  if (res.amount != null) {
-    try {
-      await store.setScanAmount('${r['scan_id']}', res.amount!);
-    } catch (e) {
-      m.showSnackBar(SnackBar(content: Text(errText(e))));
-    }
-  }
   if (res.offer == null) return;
   final saved = await store.recordOffer('${r['client_id']}', res.offer!, scanId: '${r['scan_id']}');
   m.showSnackBar(SnackBar(
@@ -89,8 +82,7 @@ Future<void> pickOfferForScan(BuildContext context, Map<String, dynamic> r) asyn
 
 class _Pick {
   final Map<String, dynamic>? offer; // null = récompense de fidélité (ou « aucune offre » en mode scan)
-  final double? amount;
-  const _Pick(this.offer, {this.amount});
+  const _Pick(this.offer);
 }
 
 class _OfferPickDialog extends StatefulWidget {
@@ -104,10 +96,6 @@ class _OfferPickDialog extends StatefulWidget {
 
 class _OfferPickDialogState extends State<_OfferPickDialog> {
   int? sel; // -1 = récompense standard / aucune offre, sinon index dans offers
-  final amount = TextEditingController();
-
-  @override
-  void dispose() { amount.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -163,10 +151,6 @@ class _OfferPickDialogState extends State<_OfferPickDialog> {
                   ? option(-1, Icons.do_not_disturb_alt_rounded, tr('Aucune offre', 'بدون عرض'), tr('Simple passage', 'زيارة عادية'))
                   : option(-1, Icons.workspace_premium_rounded, tr('Récompense de fidélité', 'مكافأة الولاء'), '${store.threshold} ${tr('points', 'نقطة')}'),
             if (widget.offers.isEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(tr('Aucune offre en cours. Créez-en dans Commerce > Offres.', 'لا توجد عروض سارية. أنشئ عرضًا من المتجر > العروض.'), style: const TextStyle(fontSize: 12.5, color: kMuted))),
-            if (widget.scan && store.askAmount && store.hasAmount) ...[
-              const SizedBox(height: 8),
-              TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: tr('Montant de l\'achat (optionnel)', 'مبلغ الشراء (اختياري)'), suffixText: 'DA')),
-            ],
           ]),
         ),
       ),
@@ -176,8 +160,7 @@ class _OfferPickDialogState extends State<_OfferPickDialog> {
           onPressed: sel == null
               ? null
               : () {
-                  final v = double.tryParse(amount.text.replaceAll(',', '.').replaceAll(' ', ''));
-                  Navigator.pop(context, _Pick(sel == -1 ? null : widget.offers[sel!], amount: v != null && v > 0 ? v : null));
+                  Navigator.pop(context, _Pick(sel == -1 ? null : widget.offers[sel!]));
                 },
           child: Text(tr('Valider', 'تأكيد')),
         ),
