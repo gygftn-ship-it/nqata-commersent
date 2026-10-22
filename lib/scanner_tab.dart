@@ -193,10 +193,14 @@ class _ScannerTabState extends State<ScannerTab> {
   }
 
   Future<void> _success(Map<String, dynamic> r) {
+    // Si le montant est obligatoire, la feuille ne se ferme pas tant que les points ne sont pas validés (ou le scan annulé).
+    final must = store.hasAmount;
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      showDragHandle: true,
+      isDismissible: !must,
+      enableDrag: !must,
+      showDragHandle: !must,
       builder: (_) => _ScanResultSheet(r),
     );
   }
@@ -239,7 +243,10 @@ class _ScannerTabState extends State<ScannerTab> {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: store,
         builder: (_, __) {
-          final valid = store.scans.where((s) => s['undone_at'] == null).toList();
+          // Un scan sans montant est « en attente » : ses points ne sont pas validés.
+          bool pending(Map<String, dynamic> s) => store.hasAmount && s['undone_at'] == null && amountOf(s) == null;
+          final pendingScans = store.scans.where(pending).toList();
+          final valid = store.scans.where((s) => s['undone_at'] == null && !pending(s)).toList();
           final points = valid.fold<int>(0, (a, s) => a + ((s['points'] as num?)?.toInt() ?? 0));
           final recent = store.scans.take(6).toList();
           return NqScreen(
@@ -346,6 +353,23 @@ class _ScannerTabState extends State<ScannerTab> {
                     const SizedBox(width: 8),
                     FilledButton(onPressed: () { _handle(manual.text); manual.clear(); }, child: Text(tr('Valider', 'تأكيد'))),
                   ]),
+                  if (pendingScans.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: kAccentSoft, borderRadius: BorderRadius.circular(16)),
+                      child: Row(children: [
+                        const Icon(Icons.warning_amber_rounded, color: kInk),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            tr('${pendingScans.length} scan(s) sans montant : touchez-les pour valider les points.', '${pendingScans.length} مسح بدون مبلغ: المسها لتأكيد النقاط.'),
+                            style: const TextStyle(color: kInk, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ],
                   const SizedBox(height: 14),
                   Text(tr('Derniers scans', 'آخر المسح'), style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                   if (recent.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Center(child: Text(tr('Aucun scan aujourd\'hui', 'لا مسح اليوم'), style: const TextStyle(color: kMuted)))),
@@ -354,11 +378,11 @@ class _ScannerTabState extends State<ScannerTab> {
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       onTap: store.hasAmount && s['undone_at'] == null ? () => showAmountDialog(context, '${s['id']}', amountOf(s)) : null,
-                      leading: CircleAvatar(radius: 16, backgroundColor: s['undone_at'] != null ? kMuted : kOk, child: Icon(s['undone_at'] != null ? Icons.block : Icons.check, size: 16, color: Colors.white)),
+                      leading: CircleAvatar(radius: 16, backgroundColor: s['undone_at'] != null ? kMuted : pending(s) ? kBronze : kOk, child: Icon(s['undone_at'] != null ? Icons.block : pending(s) ? Icons.hourglass_top_rounded : Icons.check, size: 16, color: Colors.white)),
                       title: Text(store.clientName(s['client_id'] as String?)),
-                      subtitle: Text('${hm(s['created_at'] as String?)}${s['undone_at'] != null ? ' · ${tr('annulé', 'ملغى')}' : ''}${amountOf(s) != null ? ' · ${fmtMoney(amountOf(s)!)}' : ''}'),
+                      subtitle: Text('${hm(s['created_at'] as String?)}${s['undone_at'] != null ? ' · ${tr('annulé', 'ملغى')}' : ''}${pending(s) ? ' · ${tr('montant manquant', 'المبلغ ناقص')}' : ''}${amountOf(s) != null ? ' · ${fmtMoney(amountOf(s)!)}' : ''}', style: pending(s) ? const TextStyle(color: kBronze, fontWeight: FontWeight.w600) : null),
                       trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                        Text('+${s['points']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(pending(s) ? tr('En attente', 'قيد الانتظار') : '+${s['points']}', style: const TextStyle(fontWeight: FontWeight.bold)),
                         if (canUndoScan(s))
                           IconButton(
                             icon: const NIcon(NI.undo, size: 20),
@@ -382,7 +406,7 @@ class _ScannerTabState extends State<ScannerTab> {
       );
 }
 
-/// Résultat d'un scan : points, progression, montant de l'achat, récompense.
+/// Résultat d'un scan : points, progression, montant payé (obligatoire pour valider), récompense.
 class _ScanResultSheet extends StatefulWidget {
   final Map<String, dynamic> r;
   const _ScanResultSheet(this.r);
@@ -392,22 +416,16 @@ class _ScanResultSheet extends StatefulWidget {
 
 class _ScanResultSheetState extends State<_ScanResultSheet> {
   final amount = TextEditingController();
-  Timer? timer;
-  bool busy = false;
+  bool busy = false, saved = false;
 
   Map<String, dynamic> get r => widget.r;
   int get bal => (r['balance'] as num).toInt();
   bool get ready => bal >= store.threshold;
+  // Tant que le montant n'est pas saisi, les points ne sont pas validés et la feuille ne peut pas être fermée.
+  bool get needAmount => store.hasAmount && !saved;
 
   @override
-  void initState() {
-    super.initState();
-    // Se ferme tout seul au bout de 8 s, sauf si une récompense est à valider ou si l'on touche l'écran.
-    if (!ready && store.autoCloseSecs > 0) timer = Timer(Duration(seconds: store.autoCloseSecs), () { if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop(); });
-  }
-
-  @override
-  void dispose() { timer?.cancel(); amount.dispose(); super.dispose(); }
+  void dispose() { amount.dispose(); super.dispose(); }
 
   Future<void> _run(Future<void> Function() action, String okMsg) async {
     final m = ScaffoldMessenger.of(context);
@@ -423,26 +441,46 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
     }
   }
 
-  void _saveAmount() {
+  /// Enregistre le montant payé = valide les points.
+  Future<void> _validate() async {
     final v = double.tryParse(amount.text.replaceAll(',', '.').replaceAll(' ', ''));
-    if (v == null || v <= 0) { snack(context, tr('Montant invalide', 'مبلغ غير صالح')); return; }
-    _run(() => store.setScanAmount('${r['scan_id']}', v), tr('Montant enregistré', 'تم حفظ المبلغ'));
+    if (v == null || v <= 0) { snack(context, tr('Indiquez le montant payé par le client', 'أدخل المبلغ الذي دفعه الزبون')); return; }
+    final m = ScaffoldMessenger.of(context);
+    final nav = Navigator.of(context);
+    setState(() => busy = true);
+    try {
+      await store.setScanAmount('${r['scan_id']}', v);
+      if (!mounted) return;
+      final okMsg = tr('Points validés', 'تم تأكيد النقاط');
+      if (ready && r['client_id'] != null) {
+        // Récompense disponible : on reste ouvert pour la valider.
+        setState(() { saved = true; busy = false; });
+        m.showSnackBar(SnackBar(content: Text(okMsg)));
+      } else {
+        nav.pop();
+        m.showSnackBar(SnackBar(content: Text(okMsg)));
+      }
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(errText(e))));
+      if (mounted) setState(() => busy = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final thr = store.threshold;
     final theme = Theme.of(context);
-    return Listener(
-      onPointerDown: (_) => timer?.cancel(),
+    return PopScope(
+      canPop: !needAmount,
       child: Padding(
-        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
+        padding: EdgeInsets.fromLTRB(20, needAmount ? 24 : 0, 20, 20 + MediaQuery.of(context).viewInsets.bottom),
         child: SingleChildScrollView(
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Icon(Icons.check_circle_outline_rounded, color: kOk, size: 48),
+            Icon(needAmount ? Icons.hourglass_top_rounded : Icons.check_circle_outline_rounded, color: needAmount ? kBronze : kOk, size: 48),
             const SizedBox(height: 6),
             Text('${r['client_name']}', textAlign: TextAlign.center, style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
             Text('+${r['points_added']} ${tr('points', 'نقطة')}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w700, fontFeatures: [FontFeature.tabularFigures()])),
+            if (needAmount) Text(tr('En attente de validation', 'في انتظار التأكيد'), style: const TextStyle(color: kBronze, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (bal / thr).clamp(0.0, 1.0), minHeight: 6)),
             const SizedBox(height: 6),
@@ -453,23 +491,32 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
                 margin: const EdgeInsets.only(top: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: BorderRadius.circular(12)),
-                child: Text('${tr('Récompense disponible', 'مكافأة متاحة')}', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+                child: Text(tr('Récompense disponible', 'مكافأة متاحة'), textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
             if (store.hasAmount) ...[
               const SizedBox(height: 16),
-              Row(children: [
-                Expanded(
-                  child: TextField(
-                    controller: amount,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    onTap: () => timer?.cancel(),
-                    decoration: InputDecoration(labelText: tr('Montant de l\'achat (optionnel)', 'مبلغ الشراء (اختياري)'), suffixText: 'DA'),
-                    onSubmitted: (_) => _saveAmount(),
-                  ),
+              if (needAmount) ...[
+                TextField(
+                  controller: amount,
+                  autofocus: true,
+                  enabled: !busy,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  textInputAction: TextInputAction.done,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  decoration: InputDecoration(labelText: tr('Montant payé par le client *', 'المبلغ الذي دفعه الزبون *'), suffixText: 'DA'),
+                  onSubmitted: (_) => _validate(),
                 ),
-                const SizedBox(width: 8),
-                FilledButton.tonal(onPressed: busy ? null : _saveAmount, child: const Icon(Icons.check_rounded)),
-              ]),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(tr('Obligatoire : les points ne sont validés qu\'une fois le montant saisi.', 'إجباري: لا تُؤكَّد النقاط إلا بعد إدخال المبلغ.'), style: const TextStyle(fontSize: 12.5, color: kMuted)),
+                ),
+              ] else
+                Row(children: [
+                  const Icon(Icons.check_circle_rounded, color: kOk, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('${tr('Montant', 'المبلغ')} : ${amount.text.trim()} DA', style: const TextStyle(fontWeight: FontWeight.w600))),
+                ]),
             ],
             const SizedBox(height: 14),
             Row(children: [
@@ -479,7 +526,9 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
                 onPressed: busy ? null : () => _run(() => store.undo('${r['scan_id']}'), tr('Scan annulé', 'تم إلغاء المسح')),
               ),
               const Spacer(),
-              if (ready && r['client_id'] != null)
+              if (needAmount)
+                FilledButton(onPressed: busy ? null : _validate, child: Text(tr('Valider les points', 'تأكيد النقاط')))
+              else if (ready && r['client_id'] != null)
                 FilledButton(
                   onPressed: busy ? null : () async {
                     final nav = Navigator.of(context);
