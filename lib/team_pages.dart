@@ -228,6 +228,7 @@ class _TeamSectionState extends State<TeamSection> {
               ? IconButton(
                   icon: const Icon(Icons.person_remove_outlined),
                   onPressed: () async {
+                    if (!await confirmAction(context, title: tr('Retirer ce membre ?', 'إزالة هذا العضو؟'), body: '${m['display_name']}', confirm: tr('Retirer', 'إزالة'), danger: true)) return;
                     try {
                       await store.removeStaff('${m['user_id']}');
                     } catch (e) {
