@@ -586,7 +586,7 @@ class NqataPro extends StatelessWidget {
     return ThemeData(
       useMaterial3: true,
       splashFactory: InkSparkle.splashFactory,
-      pageTransitionsTheme: const PageTransitionsTheme(builders: {TargetPlatform.android: CupertinoPageTransitionsBuilder(), TargetPlatform.iOS: CupertinoPageTransitionsBuilder()}),
+      pageTransitionsTheme: PageTransitionsTheme(builders: {TargetPlatform.android: CupertinoPageTransitionsBuilder(), TargetPlatform.iOS: CupertinoPageTransitionsBuilder()}),
       colorScheme: scheme,
       scaffoldBackgroundColor: bg,
       dividerColor: hair,
