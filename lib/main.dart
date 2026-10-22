@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'local_store.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tabs.dart';
