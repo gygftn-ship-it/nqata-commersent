@@ -82,23 +82,18 @@ class Store extends ChangeNotifier {
 
   // ----- Réglages locaux (propres à cet appareil) -----
   String offerAsk = 'scan'; // quand demander l'offre : 'scan' (à chaque scan) · 'reward' (récompense seulement) · 'never'
-  bool offerAllowNone = true, askAmount = false, haptics = true;
-  int autoCloseSecs = 8; // fermeture auto du résultat de scan (0 = jamais)
+  bool offerAllowNone = true, haptics = true;
 
   void loadPrefs() {
     final a = FileStore.get('offerAsk');
     offerAsk = (a == 'reward' || a == 'never') ? a! : 'scan';
     offerAllowNone = FileStore.get('offerAllowNone') != 'false';
-    askAmount = FileStore.get('askAmount') == 'true';
     haptics = FileStore.get('haptics') != 'false';
-    autoCloseSecs = int.tryParse(FileStore.get('autoCloseSecs') ?? '') ?? 8;
   }
 
   void setOfferAsk(String v) { offerAsk = v; FileStore.set('offerAsk', v); notifyListeners(); }
   void setOfferAllowNone(bool v) { offerAllowNone = v; FileStore.set('offerAllowNone', '$v'); notifyListeners(); }
-  void setAskAmount(bool v) { askAmount = v; FileStore.set('askAmount', '$v'); notifyListeners(); }
   void setHaptics(bool v) { haptics = v; FileStore.set('haptics', '$v'); notifyListeners(); }
-  void setAutoClose(int s) { autoCloseSecs = s; FileStore.set('autoCloseSecs', '$s'); notifyListeners(); }
   void buzz({bool heavy = false}) {
     if (!haptics) return;
     heavy ? HapticFeedback.heavyImpact() : HapticFeedback.mediumImpact();
