@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import 'main.dart';
 import 'tabs.dart';
 import 'ui.dart';
+import 'offers_page.dart';
 import 'icons.dart';
 
 class ScanFrame extends StatefulWidget {
@@ -370,7 +371,11 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
               const Spacer(),
               if (ready && r['client_id'] != null)
                 FilledButton(
-                  onPressed: busy ? null : () => _run(() => store.redeem('${r['client_id']}'), tr('Récompense validée', 'تم تأكيد المكافأة')),
+                  onPressed: busy ? null : () async {
+                    final nav = Navigator.of(context);
+                    final ok = await validateWithOffer(context, '${r['client_id']}', '${r['client_name']}');
+                    if (ok && nav.canPop()) nav.pop();
+                  },
                   child: Text(tr('Valider la récompense', 'تأكيد المكافأة')),
                 )
               else
