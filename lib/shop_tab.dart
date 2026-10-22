@@ -266,7 +266,7 @@ class _ShopTabState extends State<ShopTab> {
           final theme = Theme.of(context);
           final roles = {'owner': tr('Propriétaire', 'مالك'), 'manager': tr('Gérant', 'مدير'), 'employee': tr('Employé', 'موظف')};
           final located = store.shop?['lat'] != null && store.shop?['lng'] != null;
-          final activeOffers = store.offers.where((o) => o['expires_at'] == null || localDt(o['expires_at']).isAfter(DateTime.now())).length;
+          final activeOffers = store.offers.where(store.offerLive).length;
           final avg = (store.rating?['avg_rating'] as num?)?.toDouble();
           return NqScreen(
             title: tr('Commerce', 'المتجر'),
