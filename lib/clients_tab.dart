@@ -3,6 +3,7 @@ import 'main.dart';
 import 'tabs.dart';
 import 'icons.dart';
 import 'ui.dart';
+import 'offers_page.dart';
 
 /// Statistiques d'un client calculées depuis l'historique (6 derniers mois).
 class ClientStat {
@@ -151,14 +152,7 @@ class _ClientsTabState extends State<ClientsTab> {
       ]),
       trailing: ready
           ? FilledButton.tonal(
-              onPressed: () async {
-                try {
-                  await store.redeem('${c['client_id']}');
-                  snack(context, tr('Récompense validée', 'تم تأكيد المكافأة'));
-                } catch (e) {
-                  snack(context, errText(e));
-                }
-              },
+              onPressed: () => validateWithOffer(context, '${c['client_id']}', name),
               child: Text(tr('Valider', 'تأكيد')),
             )
           : const Icon(Icons.chevron_right_rounded),
@@ -216,15 +210,9 @@ class ClientSheet extends StatelessWidget {
               icon: const NIcon(NI.gift, size: 20),
               label: Text(tr('Valider la récompense', 'تأكيد المكافأة')),
               onPressed: () async {
-                final m = ScaffoldMessenger.of(context);
                 final nav = Navigator.of(context);
-                try {
-                  await store.redeem(id);
-                  nav.pop();
-                  m.showSnackBar(SnackBar(content: Text(tr('Récompense validée', 'تم تأكيد المكافأة'))));
-                } catch (e) {
-                  m.showSnackBar(SnackBar(content: Text(errText(e))));
-                }
+                final ok = await validateWithOffer(context, id, name);
+                if (ok && nav.canPop()) nav.pop();
               },
             ),
           ),
