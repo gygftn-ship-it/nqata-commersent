@@ -125,6 +125,26 @@ void snack(BuildContext context, String m) {
   if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
 }
 
+/// Fenêtre de confirmation commune (actions sensibles : déconnexion, retrait d'un membre…).
+Future<bool> confirmAction(BuildContext context, {required String title, required String body, required String confirm, bool danger = false}) async {
+  final ok = await showDialog<bool>(
+    context: context,
+    builder: (d) => AlertDialog(
+      title: Text(title),
+      content: Text(body),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(d, false), child: Text(tr('Annuler', 'إلغاء'))),
+        FilledButton(
+          style: FilledButton.styleFrom(minimumSize: const Size(0, 44), backgroundColor: danger ? kDanger : null, foregroundColor: danger ? Colors.white : null),
+          onPressed: () => Navigator.pop(d, true),
+          child: Text(confirm),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
+
 /// Un employé peut annuler ses propres scans pendant 5 min ; un gérant, tous.
 bool canUndoScan(Map<String, dynamic> s) {
   if (s['undone_at'] != null) return false;
@@ -151,15 +171,19 @@ class _ShellState extends State<Shell> {
   @override
   Widget build(BuildContext context) {
     // Les statistiques (chiffre d'affaires, etc.) sont réservées au propriétaire et aux gérants.
-    final items = <(Widget, NI, String)>[
-      (const ScannerTab(), NI.scan, tr('Scanner', 'مسح')),
-      (const ClientsTab(), NI.clients, tr('Clients', 'الزبائن')),
-      (const ShopTab(), NI.shop, tr('Commerce', 'المتجر')),
-      if (store.manager) (const StatsTab(), NI.stats, tr('Stats', 'الإحصاءات')),
-      (const ProfileTab(), NI.profile, tr('Profil', 'الحساب')),
+    final ready = store.clients.where((c) => (c['points'] as num) >= store.threshold).length; // récompenses à valider → pastille sur « Clients »
+    final items = <(Widget, NI, String, int)>[
+      (const ScannerTab(), NI.scan, tr('Scanner', 'مسح'), 0),
+      (const ClientsTab(), NI.clients, tr('Clients', 'الزبائن'), ready),
+      (const ShopTab(), NI.shop, tr('Commerce', 'المتجر'), 0),
+      if (store.manager) (const StatsTab(), NI.stats, tr('Stats', 'الإحصاءات'), 0),
+      (const ProfileTab(), NI.profile, tr('Profil', 'الحساب'), 0),
     ];
     if (tab >= items.length) tab = items.length - 1;
-    return Scaffold(
+    return PopScope(
+      canPop: tab == 0,
+      onPopInvokedWithResult: (didPop, _) { if (!didPop) setState(() => tab = 0); },
+      child: Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
@@ -167,17 +191,17 @@ class _ShellState extends State<Shell> {
       ),
       bottomNavigationBar: _NavBar(
         index: tab,
-        items: [for (final it in items) (it.$2, it.$3)],
+        items: [for (final it in items) (it.$2, it.$3, it.$4)],
         onTap: (i) { HapticFeedback.selectionClick(); setState(() => tab = i); },
       ),
-    );
+    ));
   }
 }
 
 /// Barre du bas flottante (beige) : l'onglet actif devient une pastille jaune avec son nom.
 class _NavBar extends StatelessWidget {
   final int index;
-  final List<(NI, String)> items;
+  final List<(NI, String, int)> items;
   final ValueChanged<int> onTap;
   const _NavBar({required this.index, required this.items, required this.onTap});
 
@@ -203,7 +227,7 @@ class _NavBar extends StatelessWidget {
                 child: Semantics(
                   button: true,
                   selected: i == index,
-                  label: items[i].$2,
+                  label: items[i].$3 > 0 ? '${items[i].$2}, ${items[i].$3}' : items[i].$2,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => onTap(i),
@@ -214,7 +238,20 @@ class _NavBar extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(color: i == index ? kAccent : Colors.transparent, borderRadius: BorderRadius.circular(30)),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        NIcon(items[i].$1, size: 24, color: i == index ? kInk : (dark ? Colors.white60 : kMuted)),
+                        Stack(clipBehavior: Clip.none, children: [
+                          NIcon(items[i].$1, size: 24, color: i == index ? kInk : (dark ? Colors.white60 : kMuted)),
+                          if (items[i].$3 > 0)
+                            PositionedDirectional(
+                              end: -8,
+                              top: -6,
+                              child: Container(
+                                constraints: const BoxConstraints(minWidth: 16),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(color: kDanger, borderRadius: BorderRadius.circular(10), border: Border.all(color: i == index ? kAccent : (dark ? const Color(0xFF2A2720) : kNavBeige), width: 1.5)),
+                                child: Text(items[i].$3 > 9 ? '9+' : '${items[i].$3}', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800)),
+                              ),
+                            ),
+                        ]),
                         if (i == index) ...[
                           const SizedBox(width: 6),
                           Flexible(child: Text(items[i].$2, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: kInk))),
