@@ -242,17 +242,26 @@ class _TeamSectionState extends State<TeamSection> {
       const SizedBox(height: 4),
       Text(tr('Générez un QR unique pour chaque personne : il ne fonctionne qu\'une fois.', 'أنشئ رمز QR فريدًا لكل شخص: يعمل مرة واحدة فقط.'), style: const TextStyle(fontSize: 12.5, color: kMuted)),
       const SizedBox(height: 10),
-      TextField(controller: label, textCapitalization: TextCapitalization.words, decoration: InputDecoration(labelText: tr('Nom de la personne (optionnel)', 'اسم الشخص (اختياري)'))),
+      TextField(controller: label, textCapitalization: TextCapitalization.words, decoration: InputDecoration(prefixIcon: const Icon(Icons.person_outline_rounded), hintText: tr('Nom (optionnel)', 'الاسم (اختياري)'))),
       if (store.isOwner) ...[
         const SizedBox(height: 10),
-        SizedBox(
-          width: double.infinity,
-          child: SegmentedButton<String>(
-            segments: [ButtonSegment(value: 'employee', label: Text(roles['employee']!)), ButtonSegment(value: 'manager', label: Text(roles['manager']!))],
-            selected: {role},
-            onSelectionChanged: (s) => setState(() => role = s.first),
-          ),
-        ),
+        Row(children: [
+          for (final r in const ['employee', 'manager'])
+            Expanded(
+              child: Padding(
+                padding: EdgeInsetsDirectional.only(end: r == 'employee' ? 8 : 0),
+                child: GestureDetector(
+                  onTap: () => setState(() => role = r),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: role == r ? kAccent : Colors.transparent, borderRadius: BorderRadius.circular(30), border: Border.all(color: role == r ? kAccent : kLine, width: 1.5)),
+                    child: Text(roles[r]!, style: TextStyle(fontWeight: FontWeight.w800, color: role == r ? kInk : null)),
+                  ),
+                ),
+              ),
+            ),
+        ]),
       ],
       const SizedBox(height: 12),
       SizedBox(
@@ -266,7 +275,7 @@ class _TeamSectionState extends State<TeamSection> {
       if (store.errors['invites'] != null)
         Padding(
           padding: const EdgeInsets.only(top: 8),
-          child: Text(tr('Invitations indisponibles : appliquez le fichier supabase_team_qr.sql.', 'الدعوات غير متاحة: طبّق ملف supabase_team_qr.sql.'), style: const TextStyle(fontSize: 12, color: kWarn)),
+          child: SelectableText('${tr('Invitations indisponibles', 'الدعوات غير متاحة')} : ${store.errors['invites']}', style: const TextStyle(fontSize: 12, color: kWarn)),
         ),
       if (store.invites.isNotEmpty) ...[
         const SizedBox(height: 14),
