@@ -7,6 +7,7 @@ import 'tabs.dart';
 import 'team_pages.dart';
 import 'icons.dart';
 import 'ui.dart';
+import 'auth_ui.dart';
 
 // La clé "publishable" est faite pour être dans l'app : la sécurité vient des règles (RLS) de la base.
 const supabaseUrl = 'https://nmecbbmlvrzeqazapijf.supabase.co';
@@ -665,85 +666,130 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final name = TextEditingController(), email = TextEditingController(), pass = TextEditingController();
+  final emailFocus = FocusNode(), passFocus = FocusNode();
   bool signup = false, busy = false;
   String role = 'owner'; // à l'inscription : 'owner' (gérant) ou 'employee' (rejoint une équipe)
-  String? error;
+  String? error, info, nameErr, emailErr, passErr;
 
   @override
-  void dispose() { name.dispose(); email.dispose(); pass.dispose(); super.dispose(); }
+  void dispose() { name.dispose(); email.dispose(); pass.dispose(); emailFocus.dispose(); passFocus.dispose(); super.dispose(); }
+
+  bool _validate() {
+    emailErr = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email.text.trim()) ? null : tr('Adresse e-mail invalide', 'بريد إلكتروني غير صالح');
+    passErr = signup
+        ? (pass.text.length >= 6 ? null : tr('6 caractères minimum', '6 أحرف على الأقل'))
+        : (pass.text.isNotEmpty ? null : tr('Entrez votre mot de passe', 'أدخل كلمة السر'));
+    nameErr = signup && name.text.trim().isEmpty ? tr('Entrez votre prénom', 'أدخل اسمك') : null;
+    setState(() {});
+    return emailErr == null && passErr == null && nameErr == null;
+  }
 
   Future<void> _submit() async {
-    setState(() { busy = true; error = null; });
+    FocusScope.of(context).unfocus();
+    setState(() { error = null; info = null; });
+    if (!_validate()) return;
+    setState(() => busy = true);
     try {
       final e = email.text.trim();
       signup ? await store.signUp(e, pass.text, name.text.trim(), mode: role) : await store.signIn(e, pass.text);
     } catch (err) {
-      if (mounted) setState(() => error = errText(err));
+      if ('$err'.contains('confirm_email')) {
+        if (mounted) setState(() { info = errText(err); signup = false; });
+      } else if (mounted) {
+        setState(() => error = errText(err));
+      }
     }
     if (mounted) setState(() => busy = false);
   }
 
-  Widget _f(TextEditingController c, String l, {bool secret = false, TextInputType? type}) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, obscureText: secret, keyboardType: type, decoration: InputDecoration(labelText: l)),
-      );
+  void _switch(bool toSignup) => setState(() { signup = toSignup; error = null; info = null; nameErr = emailErr = passErr = null; });
+
+  Widget _role(String v, IconData i, String t, String s) {
+    final sel = role == v;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => role = v),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: sel ? (isDark(context) ? const Color(0xFF3A372E) : kAccentSoft) : cardColor(context),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: sel ? kAccent : Colors.transparent, width: 2),
+          ),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(i, size: 28),
+            const SizedBox(height: 8),
+            Text(t, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+            const SizedBox(height: 2),
+            Text(s, style: const TextStyle(fontSize: 12, color: kMuted)),
+          ]),
+        ),
+      ),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        body: NqScreen(
-          title: 'Nqata Pro',
-          header: [Text(tr('Espace commerçant', 'فضاء التاجر'), style: const TextStyle(color: Colors.white70, fontSize: 17))],
-          body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 420),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                  if (signup) ...[
-                    Text(tr('Vous êtes…', 'أنت…'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 8),
-                    SizedBox(
-                      width: double.infinity,
-                      child: SegmentedButton<String>(
-                        segments: [
-                          ButtonSegment(value: 'owner', icon: const Icon(Icons.storefront_rounded), label: Text(tr('Gérant', 'مدير'))),
-                          ButtonSegment(value: 'employee', icon: const Icon(Icons.badge_rounded), label: Text(tr('Employé', 'موظف'))),
-                        ],
-                        selected: {role},
-                        onSelectionChanged: (s) => setState(() => role = s.first),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      role == 'owner'
-                          ? tr('Vous enregistrez votre commerce.', 'ستسجّل متجرك.')
-                          : tr('Vous rejoindrez une équipe en scannant le QR code donné par votre gérant.', 'ستنضم إلى فريق بمسح رمز QR الذي يعطيه لك مديرك.'),
-                      style: const TextStyle(fontSize: 12.5, color: kMuted),
-                    ),
-                    const SizedBox(height: 14),
-                    _f(name, tr('Votre prénom', 'اسمك')),
-                  ],
-                  _f(email, 'E-mail', type: TextInputType.emailAddress),
-                  _f(pass, tr('Mot de passe (6 caractères min.)', 'كلمة السر (6 أحرف على الأقل)'), secret: true),
-                  if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
-                  FilledButton(
-                    onPressed: busy ? null : _submit,
-                    child: busy
-                        ? SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
-                        : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
+  Widget build(BuildContext context) => AuthScaffold(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 440),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                AuthTabs(labels: [tr('Connexion', 'دخول'), tr('Inscription', 'تسجيل')], selected: signup ? 1 : 0, onChanged: (i) => _switch(i == 1)),
+                const SizedBox(height: 22),
+                Text(
+                  signup ? tr('Créez votre compte', 'أنشئ حسابك') : tr('Tout à portée de main !', 'كل شيء في متناول يدك!'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w900, height: 1.15),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  signup
+                      ? tr('Quelques secondes pour commencer à fidéliser vos clients.', 'بضع ثوانٍ لتبدأ في تحفيز ولاء زبائنك.')
+                      : tr('Scannez vos clients, offrez des récompenses et suivez vos ventes.', 'امسح زبائنك، قدّم المكافآت وتابع مبيعاتك.'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 15, color: kMuted, height: 1.35),
+                ),
+                const SizedBox(height: 24),
+                if (signup) ...[
+                  Text(tr('Vous êtes…', 'أنت…'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                  const SizedBox(height: 8),
+                  Row(children: [
+                    _role('owner', Icons.storefront_rounded, tr('Gérant', 'مدير'), tr('J\'enregistre mon commerce', 'أسجّل متجري')),
+                    const SizedBox(width: 10),
+                    _role('employee', Icons.badge_rounded, tr('Employé', 'موظف'), tr('Je rejoins une équipe via QR', 'أنضم إلى فريق عبر QR')),
+                  ]),
+                  const SizedBox(height: 18),
+                  AuthField(label: tr('Prénom', 'الاسم'), controller: name, icon: Icons.person_rounded, hint: tr('Votre prénom', 'اسمك'), error: nameErr, action: TextInputAction.next, onChanged: (_) { if (nameErr != null) setState(() => nameErr = null); }, onSubmitted: (_) => emailFocus.requestFocus()),
+                ],
+                AuthField(label: 'E-mail', controller: email, focus: emailFocus, icon: Icons.mail_rounded, hint: 'nom@exemple.com', type: TextInputType.emailAddress, error: emailErr, action: TextInputAction.next, onChanged: (_) { if (emailErr != null) setState(() => emailErr = null); }, onSubmitted: (_) => passFocus.requestFocus()),
+                AuthField(label: tr('Mot de passe', 'كلمة السر'), controller: pass, focus: passFocus, icon: Icons.lock_rounded, hint: signup ? tr('6 caractères minimum', '6 أحرف على الأقل') : '••••••••', secret: true, error: passErr, action: TextInputAction.done, onChanged: (_) => setState(() { passErr = null; }), onSubmitted: (_) => _submit()),
+                if (signup) StrengthBar(pass.text),
+                if (error != null) AuthNotice(error!),
+                if (info != null) AuthNotice(info!, ok: true),
+                const SizedBox(height: 4),
+                FilledButton(
+                  onPressed: busy ? null : _submit,
+                  child: busy
+                      ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: kInk))
+                      : Text(signup ? tr('Créer mon compte', 'إنشاء الحساب') : tr('Se connecter', 'دخول')),
+                ),
+                const SizedBox(height: 10),
+                if (!signup)
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.qr_code_scanner_rounded),
+                    label: Text(tr('Rejoindre une équipe (scanner un QR)', 'الانضمام إلى فريق (مسح رمز QR)')),
+                    onPressed: () => setState(() { signup = true; role = 'employee'; error = null; info = null; }),
                   ),
-                  TextButton(
-                    onPressed: () => setState(() { signup = !signup; error = null; }),
-                    child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
-                  ),
-                  if (!signup)
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.qr_code_scanner_rounded),
-                      label: Text(tr('Rejoindre une équipe (scanner un QR)', 'الانضمام إلى فريق (مسح رمز QR)')),
-                      onPressed: () => setState(() { signup = true; role = 'employee'; error = null; }),
-                    ),
-                ]),
-              ),
+                TextButton(
+                  onPressed: () => _switch(!signup),
+                  child: Text(signup ? tr('J\'ai déjà un compte', 'لدي حساب') : tr('Pas de compte ? S\'inscrire', 'ليس لدي حساب؟ سجّل')),
+                ),
+              ]),
             ),
           ),
         ),
@@ -761,47 +807,86 @@ class _RegisterShopPageState extends State<RegisterShopPage> {
   final name = TextEditingController(), address = TextEditingController(), phone = TextEditingController();
   String cat = 'other';
   bool busy = false;
-  String? error;
+  String? error, nameErr, phoneErr;
+
+  static const _catIcons = {
+    'cafe': Icons.local_cafe_rounded,
+    'food': Icons.shopping_basket_rounded,
+    'health': Icons.local_pharmacy_rounded,
+    'beauty': Icons.spa_rounded,
+    'other': Icons.storefront_rounded,
+  };
 
   @override
   void dispose() { name.dispose(); address.dispose(); phone.dispose(); super.dispose(); }
 
   Future<void> _go() async {
-    if (name.text.trim().isEmpty) return;
-    setState(() { busy = true; error = null; });
+    FocusScope.of(context).unfocus();
+    final raw = phone.text.trim();
+    final p = raw.isEmpty ? '' : normalizeDzPhone(raw);
+    setState(() {
+      nameErr = name.text.trim().isEmpty ? tr('Entrez le nom de votre commerce', 'أدخل اسم متجرك') : null;
+      phoneErr = p == null ? tr('Numéro invalide (ex. 555 12 34 56)', 'رقم غير صالح (مثال: 555 12 34 56)') : null;
+      error = null;
+    });
+    if (nameErr != null || phoneErr != null) return;
+    setState(() => busy = true);
     try {
-      await store.registerShop(name.text.trim(), cat, address.text.trim(), phone.text.trim());
+      await store.registerShop(name.text.trim(), cat, address.text.trim(), p!);
     } catch (e) {
       error = errText(e);
     }
     if (mounted) setState(() => busy = false);
   }
 
-  Widget _f(TextEditingController c, String l) => Padding(
-        padding: const EdgeInsets.only(bottom: 12),
-        child: TextField(controller: c, decoration: InputDecoration(labelText: l)),
-      );
+  Widget _cat((String, String, String) c) {
+    final sel = cat == c.$1;
+    return GestureDetector(
+      onTap: () => setState(() => cat = c.$1),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 104,
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: BoxDecoration(
+          color: sel ? (isDark(context) ? const Color(0xFF3A372E) : kAccentSoft) : cardColor(context),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: sel ? kAccent : Colors.transparent, width: 2),
+        ),
+        child: Column(children: [
+          Icon(_catIcons[c.$1], size: 28),
+          const SizedBox(height: 6),
+          Text(tr(c.$2, c.$3), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        ]),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
         body: NqScreen(
           title: tr('Mon commerce', 'متجري'),
           action: HeaderPill(icon: Icons.arrow_back_rounded, label: tr('Retour', 'رجوع'), onTap: () => store.setOnboardMode(null)),
-          body: ListView(padding: const EdgeInsets.all(24), children: [
-          Text(tr('Bienvenue ! Décrivez votre commerce. L\'équipe Nqata le validera avant l\'activation.', 'مرحبًا! صف متجرك. سيقوم فريق نقطة بالموافقة عليه قبل التفعيل.')),
-          const SizedBox(height: 16),
-          _f(name, tr('Nom du commerce', 'اسم المتجر')),
-          Text(tr('Type de commerce', 'نوع المتجر')),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 4, children: [for (final c in shopCats) ChoiceChip(label: Text(tr(c.$2, c.$3)), selected: cat == c.$1, onSelected: (_) => setState(() => cat = c.$1))]),
-          const SizedBox(height: 12),
-          _f(address, tr('Adresse', 'العنوان')),
-          _f(phone, tr('Téléphone', 'الهاتف')),
-          if (error != null) Padding(padding: const EdgeInsets.only(bottom: 12), child: Text(error!, style: const TextStyle(color: kDanger))),
-          FilledButton(onPressed: busy ? null : _go, child: Text(tr('Envoyer ma demande', 'إرسال الطلب'))),
-          const SizedBox(height: 8),
-          TextButton(onPressed: () => store.setOnboardMode('employee'), child: Text(tr('Je suis employé : rejoindre une équipe', 'أنا موظف: الانضمام إلى فريق'))),
-        ]),
+          body: ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.fromLTRB(24, 22, 24, 28), children: [
+            Text(tr('Tout à portée de main !', 'كل شيء في متناول يدك!'), style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 6),
+            Text(tr('Décrivez votre commerce. L\'équipe Nqata le validera avant l\'activation.', 'صف متجرك. سيقوم فريق نقطة بالموافقة عليه قبل التفعيل.'), style: const TextStyle(color: kMuted, fontSize: 15, height: 1.35)),
+            const SizedBox(height: 22),
+            AuthField(label: tr('Nom du commerce', 'اسم المتجر'), controller: name, icon: Icons.store_mall_directory_rounded, hint: tr('Ex. Café du Centre', 'مثال: مقهى المركز'), error: nameErr, action: TextInputAction.next, onChanged: (_) { if (nameErr != null) setState(() => nameErr = null); }),
+            Text(tr('Type de commerce', 'نوع المتجر'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+            const SizedBox(height: 10),
+            Wrap(spacing: 10, runSpacing: 10, children: [for (final c in shopCats) _cat(c)]),
+            const SizedBox(height: 18),
+            AuthField(label: tr('Adresse', 'العنوان'), controller: address, icon: Icons.location_on_rounded, hint: tr('Rue, quartier, ville', 'الشارع، الحي، المدينة'), action: TextInputAction.next),
+            PhoneField(label: tr('Numéro de téléphone (optionnel)', 'رقم الهاتف (اختياري)'), controller: phone, error: phoneErr, onChanged: (_) { if (phoneErr != null) setState(() => phoneErr = null); }),
+            if (error != null) AuthNotice(error!),
+            const SizedBox(height: 4),
+            FilledButton(
+              onPressed: busy ? null : _go,
+              child: busy ? const SizedBox(height: 22, width: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: kInk)) : Text(tr('Envoyer ma demande', 'إرسال الطلب')),
+            ),
+            const SizedBox(height: 8),
+            TextButton(onPressed: () => store.setOnboardMode('employee'), child: Text(tr('Je suis employé : rejoindre une équipe', 'أنا موظف: الانضمام إلى فريق'))),
+          ]),
         ),
       );
 }
