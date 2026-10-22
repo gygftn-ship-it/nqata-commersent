@@ -115,6 +115,12 @@ class _ScannerTabState extends State<ScannerTab> {
     try {
       final r = await store.scan(raw);
       if (!mounted) return;
+      // Pop-up « quelle offre le client utilise-t-il ? » (réglable dans Paramètres)
+      if (store.offerAsk == 'scan') {
+        store.buzz();
+        await pickOfferForScan(context, r);
+        if (!mounted) return;
+      }
       await _success(r);
     } catch (e) {
       if (mounted) await _error(errText(e));
@@ -124,7 +130,7 @@ class _ScannerTabState extends State<ScannerTab> {
   }
 
   Future<void> _error(String msg) {
-    HapticFeedback.heavyImpact();
+    store.buzz(heavy: true);
     return showDialog(
       context: context,
       builder: (d) {
@@ -135,7 +141,7 @@ class _ScannerTabState extends State<ScannerTab> {
   }
 
   Future<void> _success(Map<String, dynamic> r) {
-    HapticFeedback.mediumImpact();
+    store.buzz();
     return showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -293,7 +299,7 @@ class _ScanResultSheetState extends State<_ScanResultSheet> {
   void initState() {
     super.initState();
     // Se ferme tout seul au bout de 8 s, sauf si une récompense est à valider ou si l'on touche l'écran.
-    if (!ready) timer = Timer(const Duration(seconds: 8), () { if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop(); });
+    if (!ready && store.autoCloseSecs > 0) timer = Timer(Duration(seconds: store.autoCloseSecs), () { if (mounted && Navigator.of(context).canPop()) Navigator.of(context).pop(); });
   }
 
   @override
