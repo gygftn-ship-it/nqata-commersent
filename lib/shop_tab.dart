@@ -6,6 +6,8 @@ import 'tabs.dart';
 import 'icons.dart';
 import 'ui.dart';
 import 'offers_page.dart';
+import 'team_pages.dart';
+import 'reviews_page.dart';
 
 const _covers = ['#6B3F2A', '#B45309', '#15803D', '#0E7490', '#4C1D95', '#BE185D', '#1D4ED8', '#15120B', '#FFD60A'];
 const _maxGallery = 8;
@@ -44,9 +46,7 @@ class _ShopTabState extends State<ShopTab> {
   late final ppv = TextEditingController(text: '${store.shop?['points_per_visit'] ?? 10}');
   late final thr = TextEditingController(text: '${store.shop?['reward_threshold'] ?? 100}');
   late final per = TextEditingController(text: '${store.shop?['scan_period_hours'] ?? 24}');
-  final code = TextEditingController();
   late String cat = '${store.shop?['category'] ?? 'other'}';
-  String newRole = 'employee';
   TimeOfDay? open, close;
   bool saving = false, uploading = false, dirty = false;
   List<String> gallery = [];
@@ -66,7 +66,7 @@ class _ShopTabState extends State<ShopTab> {
 
   @override
   void dispose() {
-    for (final c in [addr, phone, desc, ppv, thr, per, code]) { c.dispose(); }
+    for (final c in [addr, phone, desc, ppv, thr, per]) { c.dispose(); }
     super.dispose();
   }
 
@@ -264,7 +264,6 @@ class _ShopTabState extends State<ShopTab> {
         listenable: store,
         builder: (_, __) {
           final theme = Theme.of(context);
-          final roles = {'owner': tr('Propriétaire', 'مالك'), 'manager': tr('Gérant', 'مدير'), 'employee': tr('Employé', 'موظف')};
           final located = store.shop?['lat'] != null && store.shop?['lng'] != null;
           final activeOffers = store.offers.where(store.offerLive).length;
           final avg = (store.rating?['avg_rating'] as num?)?.toDouble();
@@ -275,6 +274,7 @@ class _ShopTabState extends State<ShopTab> {
             RefreshIndicator(
               onRefresh: store.refresh,
               child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: EdgeInsets.fromLTRB(20, 20, 20, dirty ? 90 : 24), children: [
+                if (store.errors['rating'] != null) ErrorBanner(tr('avis et note', 'التقييمات'), store.errors['rating']!),
                 FadeSlideIn(child: _preview()),
                 if (store.isOwner) ...[
                   SectionCard(title: tr('Photos', 'الصور'), icon: NI.photos, children: [
@@ -333,6 +333,21 @@ class _ShopTabState extends State<ShopTab> {
                     Text('${store.shop?['points_per_visit']} ${tr('points par visite', 'نقاط لكل زيارة')}'),
                     Text('${store.threshold} ${tr('points pour une récompense', 'نقطة للمكافأة')}'),
                   ]),
+                Padding(
+                  padding: const EdgeInsets.only(top: 14),
+                  child: Material(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: theme.colorScheme.outlineVariant)),
+                    child: ListTile(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      leading: const Icon(Icons.star_rounded),
+                      title: Text(tr('Avis clients', 'آراء الزبائن'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      subtitle: Text(store.rating == null ? tr('Voir les avis', 'عرض الآراء') : '★ ${(store.rating!['avg_rating'] as num).toStringAsFixed(1)} · ${store.rating!['reviews_count']} ${tr('avis', 'تقييم')}'),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ReviewsPage())),
+                    ),
+                  ),
+                ),
                 if (store.manager)
                   Padding(
                     padding: const EdgeInsets.only(top: 14),
@@ -349,54 +364,7 @@ class _ShopTabState extends State<ShopTab> {
                       ),
                     ),
                   ),
-                if (store.manager)
-                  SectionCard(title: tr('Équipe', 'الفريق'), icon: NI.clients, children: [
-                    for (final m in store.team)
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: const CircleAvatar(child: Icon(Icons.person)),
-                        title: Text('${m['display_name']}'),
-                        subtitle: Text(roles['${m['role']}'] ?? '${m['role']}'),
-                        trailing: store.isOwner && m['role'] != 'owner'
-                            ? IconButton(
-                                icon: const Icon(Icons.person_remove_outlined),
-                                onPressed: () async {
-                                  try {
-                                    await store.removeStaff('${m['user_id']}');
-                                  } catch (e) {
-                                    snack(context, errText(e));
-                                  }
-                                },
-                              )
-                            : null,
-                      ),
-                    if (store.isOwner) ...[
-                      const SizedBox(height: 8),
-                      _field(code, tr('Code de la personne à ajouter', 'رمز الشخص المراد إضافته')),
-                      Row(children: [
-                        Expanded(
-                          child: SegmentedButton<String>(
-                            segments: [ButtonSegment(value: 'employee', label: Text(roles['employee']!)), ButtonSegment(value: 'manager', label: Text(roles['manager']!))],
-                            selected: {newRole},
-                            onSelectionChanged: (s) => setState(() => newRole = s.first),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        FilledButton(
-                          onPressed: () async {
-                            try {
-                              await store.addStaff(code.text, newRole);
-                              code.clear();
-                              snack(context, tr('Ajouté à l\'équipe', 'تمت الإضافة للفريق'));
-                            } catch (e) {
-                              snack(context, errText(e));
-                            }
-                          },
-                          child: Text(tr('Ajouter', 'إضافة')),
-                        ),
-                      ]),
-                    ],
-                  ]),
+                if (store.manager) const TeamSection(),
               ]),
             ),
             if (dirty && store.isOwner)
