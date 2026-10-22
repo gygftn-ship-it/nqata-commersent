@@ -122,24 +122,14 @@ class SettingsPage extends StatelessWidget {
                 style: const TextStyle(fontSize: 12.5, color: kMuted),
               ),
               SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(tr('Proposer « Aucune offre »', 'اقتراح «بدون عرض»')), subtitle: Text(tr('Pour un simple passage sans offre', 'لزيارة عادية بدون عرض')), value: store.offerAllowNone, onChanged: store.setOfferAllowNone),
-              SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(tr('Demander le montant dans le pop-up', 'طلب المبلغ في النافذة')), subtitle: Text(tr('Pour calculer le panier moyen', 'لحساب متوسط السلة')), value: store.askAmount, onChanged: store.setAskAmount),
               if (store.manager) ListTile(contentPadding: EdgeInsets.zero, leading: const Icon(Icons.history_rounded), title: Text(tr('Historique des offres validées', 'سجل العروض المؤكدة')), trailing: const Icon(Icons.chevron_right_rounded), onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OfferHistoryPage()))),
             ]),
             SectionCard(title: tr('Scanner', 'الماسح'), icon: NI.scan, children: [
-              Text(tr('Fermeture automatique du résultat', 'إغلاق النتيجة تلقائيًا'), style: theme.textTheme.titleSmall),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: SegmentedButton<int>(
-                  segments: [
-                    const ButtonSegment(value: 5, label: Text('5 s')),
-                    const ButtonSegment(value: 8, label: Text('8 s')),
-                    const ButtonSegment(value: 15, label: Text('15 s')),
-                    ButtonSegment(value: 0, label: Text(tr('Jamais', 'أبدًا'))),
-                  ],
-                  selected: {store.autoCloseSecs},
-                  onSelectionChanged: (s) => store.setAutoClose(s.first),
-                ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.payments_outlined),
+                title: Text(tr('Montant payé obligatoire', 'المبلغ المدفوع إجباري')),
+                subtitle: Text(tr('Les points d\'un scan ne sont validés qu\'une fois le montant payé par le client saisi.', 'لا تُؤكَّد نقاط المسح إلا بعد إدخال المبلغ الذي دفعه الزبون.')),
               ),
               SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(tr('Vibrations', 'الاهتزاز')), subtitle: Text(tr('À chaque scan réussi ou refusé', 'عند كل مسح ناجح أو مرفوض')), value: store.haptics, onChanged: store.setHaptics),
             ]),
