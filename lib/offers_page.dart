@@ -31,19 +31,28 @@ String offerValueLabel(Map<String, dynamic> o) {
 }
 
 // ---------- Pop-up de validation : quelle offre le client a-t-il choisie ? ----------
-/// Ouvre un pop-up listant les offres en cours ; le commerçant choisit celle du client puis confirme.
+/// À la récompense : le commerçant choisit l'offre du client (ou la récompense de fidélité) puis confirme.
 /// Retourne true si la récompense a été validée.
 Future<bool> validateWithOffer(BuildContext context, String clientId, String clientName) async {
   final live = store.offers.where(store.offerLive).toList();
-  final res = await showDialog<_Pick>(
-    context: context,
-    builder: (_) => _OfferPickDialog(clientName: clientName, offers: live),
-  );
+  // Réglage « Jamais » : on valide directement, sans demander l'offre.
+  final res = store.offerAsk == 'never'
+      ? const _Pick(null)
+      : await showDialog<_Pick>(
+          context: context,
+          builder: (_) => _OfferPickDialog(clientName: clientName, offers: live, scan: false),
+        );
   if (res == null || !context.mounted) return false;
   final m = ScaffoldMessenger.of(context);
   try {
-    await store.redeem(clientId, offer: res.offer);
-    m.showSnackBar(SnackBar(content: Text(res.offer == null ? tr('Récompense validée', 'تم تأكيد المكافأة') : '${tr('Offre validée', 'تم تأكيد العرض')} : ${res.offer!['title']}')));
+    final saved = await store.redeem(clientId, offer: res.offer);
+    m.showSnackBar(SnackBar(
+      content: Text(res.offer == null
+          ? tr('Récompense validée', 'تم تأكيد المكافأة')
+          : saved
+              ? '${tr('Offre validée', 'تم تأكيد العرض')} : ${res.offer!['title']}'
+              : tr('Récompense validée, mais l\'offre n\'a pas pu être enregistrée (appliquez supabase_offer_tracking.sql)', 'تم تأكيد المكافأة لكن تعذّر تسجيل العرض (طبّق supabase_offer_tracking.sql)')),
+    ));
     return true;
   } catch (e) {
     m.showSnackBar(SnackBar(content: Text(errText(e))));
@@ -51,21 +60,54 @@ Future<bool> validateWithOffer(BuildContext context, String clientId, String cli
   }
 }
 
+/// À chaque scan (réglage « Demander l'offre ») : quelle offre le client utilise-t-il ?
+/// `r` = résultat du scan (client_id, client_name, scan_id). Sans effet s'il n'y a aucune offre en cours.
+Future<void> pickOfferForScan(BuildContext context, Map<String, dynamic> r) async {
+  final live = store.offers.where(store.offerLive).toList();
+  if (live.isEmpty || r['client_id'] == null) return;
+  final res = await showDialog<_Pick>(
+    context: context,
+    builder: (_) => _OfferPickDialog(clientName: '${r['client_name']}', offers: live, scan: true),
+  );
+  if (res == null || !context.mounted) return;
+  final m = ScaffoldMessenger.of(context);
+  if (res.amount != null) {
+    try {
+      await store.setScanAmount('${r['scan_id']}', res.amount!);
+    } catch (e) {
+      m.showSnackBar(SnackBar(content: Text(errText(e))));
+    }
+  }
+  if (res.offer == null) return;
+  final saved = await store.recordOffer('${r['client_id']}', res.offer!, scanId: '${r['scan_id']}');
+  m.showSnackBar(SnackBar(
+    content: Text(saved
+        ? '${tr('Offre validée', 'تم تأكيد العرض')} : ${res.offer!['title']}'
+        : tr('L\'offre n\'a pas pu être enregistrée (appliquez supabase_offer_tracking.sql)', 'تعذّر تسجيل العرض (طبّق supabase_offer_tracking.sql)')),
+  ));
+}
+
 class _Pick {
-  final Map<String, dynamic>? offer; // null = récompense de fidélité standard
-  const _Pick(this.offer);
+  final Map<String, dynamic>? offer; // null = récompense de fidélité (ou « aucune offre » en mode scan)
+  final double? amount;
+  const _Pick(this.offer, {this.amount});
 }
 
 class _OfferPickDialog extends StatefulWidget {
   final String clientName;
   final List<Map<String, dynamic>> offers;
-  const _OfferPickDialog({required this.clientName, required this.offers});
+  final bool scan; // true : pop-up à chaque scan · false : pop-up à la récompense
+  const _OfferPickDialog({required this.clientName, required this.offers, required this.scan});
   @override
   State<_OfferPickDialog> createState() => _OfferPickDialogState();
 }
 
 class _OfferPickDialogState extends State<_OfferPickDialog> {
-  int? sel; // -1 = récompense standard, sinon index dans offers
+  int? sel; // -1 = récompense standard / aucune offre, sinon index dans offers
+  final amount = TextEditingController();
+
+  @override
+  void dispose() { amount.dispose(); super.dispose(); }
 
   @override
   Widget build(BuildContext context) {
@@ -100,8 +142,9 @@ class _OfferPickDialogState extends State<_OfferPickDialog> {
       );
     }
 
+    final showNone = !widget.scan || store.offerAllowNone;
     return AlertDialog(
-      title: Text(tr('Quelle offre valider ?', 'أي عرض تريد تأكيده؟')),
+      title: Text(widget.scan ? tr('Quelle offre le client utilise-t-il ?', 'أي عرض يستعمله الزبون؟') : tr('Quelle offre valider ?', 'أي عرض تريد تأكيده؟')),
       content: SizedBox(
         width: double.maxFinite,
         child: SingleChildScrollView(
@@ -115,20 +158,117 @@ class _OfferPickDialogState extends State<_OfferPickDialog> {
                 '${widget.offers[i]['title']}',
                 [offerValueLabel(widget.offers[i]), '${widget.offers[i]['description'] ?? ''}'].where((x) => x.isNotEmpty).join(' · '),
               ),
-            option(-1, Icons.workspace_premium_rounded, tr('Récompense de fidélité', 'مكافأة الولاء'), '${store.threshold} ${tr('points', 'نقطة')}'),
+            if (showNone)
+              widget.scan
+                  ? option(-1, Icons.do_not_disturb_alt_rounded, tr('Aucune offre', 'بدون عرض'), tr('Simple passage', 'زيارة عادية'))
+                  : option(-1, Icons.workspace_premium_rounded, tr('Récompense de fidélité', 'مكافأة الولاء'), '${store.threshold} ${tr('points', 'نقطة')}'),
             if (widget.offers.isEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(tr('Aucune offre en cours. Créez-en dans Commerce > Offres.', 'لا توجد عروض سارية. أنشئ عرضًا من المتجر > العروض.'), style: const TextStyle(fontSize: 12.5, color: kMuted))),
+            if (widget.scan && store.askAmount && store.hasAmount) ...[
+              const SizedBox(height: 8),
+              TextField(controller: amount, keyboardType: const TextInputType.numberWithOptions(decimal: true), decoration: InputDecoration(labelText: tr('Montant de l\'achat (optionnel)', 'مبلغ الشراء (اختياري)'), suffixText: 'DA')),
+            ],
           ]),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text(tr('Annuler', 'إلغاء'))),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(widget.scan ? tr('Plus tard', 'لاحقًا') : tr('Annuler', 'إلغاء'))),
         FilledButton(
-          onPressed: sel == null ? null : () => Navigator.pop(context, _Pick(sel == -1 ? null : widget.offers[sel!])),
+          onPressed: sel == null
+              ? null
+              : () {
+                  final v = double.tryParse(amount.text.replaceAll(',', '.').replaceAll(' ', ''));
+                  Navigator.pop(context, _Pick(sel == -1 ? null : widget.offers[sel!], amount: v != null && v > 0 ? v : null));
+                },
           child: Text(tr('Valider', 'تأكيد')),
         ),
       ],
     );
   }
+}
+
+// ---------- Historique : quelle offre a été validée, pour qui, quand, par qui ----------
+class OfferHistoryPage extends StatefulWidget {
+  const OfferHistoryPage({super.key});
+  @override
+  State<OfferHistoryPage> createState() => _OfferHistoryPageState();
+}
+
+class _OfferHistoryPageState extends State<OfferHistoryPage> {
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    store.loadOfferLog().then((_) { if (mounted) setState(() => loading = false); });
+  }
+
+  String _offerTitle(Map<String, dynamic> row) {
+    final saved = row['offer_title'] as String?;
+    if (saved != null && saved.isNotEmpty) return saved;
+    for (final o in store.offers) {
+      if ('${o['id']}' == '${row['offer_id']}') return '${o['title']}';
+    }
+    return tr('Offre supprimée', 'عرض محذوف');
+  }
+
+  String _staffName(Object? id) {
+    if (id == null) return '';
+    if (id == store.uid) return tr('Moi', 'أنا');
+    for (final m in store.team) {
+      if (m['user_id'] == id) return '${m['display_name']}';
+    }
+    return '';
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        body: ListenableBuilder(
+          listenable: store,
+          builder: (_, __) {
+            final rows = store.offerLog;
+            return NqScreen(
+              title: tr('Historique', 'السجل'),
+              action: HeaderPill(icon: Icons.arrow_back_rounded, label: tr('Retour', 'رجوع'), onTap: () => Navigator.pop(context)),
+              header: [Text(tr('Offres validées par vos clients', 'العروض التي أكدها زبائنك'), style: const TextStyle(color: Colors.white70, fontSize: 16))],
+              body: RefreshIndicator(
+                onRefresh: store.loadOfferLog,
+                child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 16, 16, 24), children: [
+                  if (store.errors['offerLog'] != null && rows.isEmpty) ErrorBanner(tr('historique des offres', 'سجل العروض'), store.errors['offerLog']!),
+                  if (loading) const Padding(padding: EdgeInsets.all(32), child: Center(child: CircularProgressIndicator())),
+                  if (!loading && rows.isEmpty && store.errors['offerLog'] == null) Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(tr('Aucune offre validée pour l\'instant', 'لا عروض مؤكدة بعد'), style: const TextStyle(color: kMuted)))),
+                  for (var i = 0; i < rows.length; i++)
+                    FadeSlideIn(
+                      index: i,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(color: cardColor(context), borderRadius: BorderRadius.circular(22)),
+                        child: Row(children: [
+                          Container(width: 42, height: 42, decoration: BoxDecoration(color: kAccent, borderRadius: BorderRadius.circular(14)), child: const Icon(Icons.local_offer_rounded, color: kInk, size: 22)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(_offerTitle(rows[i]), style: const TextStyle(fontWeight: FontWeight.w800)),
+                              Text(
+                                [
+                                  store.clientName(rows[i]['client_id'] as String?),
+                                  if (rows[i]['created_at'] != null) '${dmy(localDt(rows[i]['created_at']))} ${hm(rows[i]['created_at'] as String?)}',
+                                  if (_staffName(rows[i]['staff_id']).isNotEmpty) '${tr('par', 'بواسطة')} ${_staffName(rows[i]['staff_id'])}',
+                                ].join(' · '),
+                                style: const TextStyle(fontSize: 12.5, color: kMuted),
+                              ),
+                            ]),
+                          ),
+                          if (rows[i]['source'] == 'reward') const Icon(Icons.workspace_premium_rounded, size: 20, color: kBronze),
+                        ]),
+                      ),
+                    ),
+                ]),
+              ),
+            );
+          },
+        ),
+      );
 }
 
 // ---------- Page des offres ----------
@@ -264,6 +404,15 @@ class _OffersPageState extends State<OffersPage> {
               body: Stack(children: [
                 ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 96), children: [
                   if (store.errors['offers'] != null) ErrorBanner(tr('offres', 'العروض'), store.errors['offers']!),
+                  if (store.offersExt)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: OutlinedButton.icon(
+                        icon: const Icon(Icons.history_rounded),
+                        label: Text(tr('Historique des offres validées', 'سجل العروض المؤكدة')),
+                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OfferHistoryPage())),
+                      ),
+                    ),
                   if (!store.offersExt)
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
