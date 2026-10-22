@@ -120,7 +120,18 @@ class _ClientsTabState extends State<ClientsTab> {
               child: RefreshIndicator(
                 onRefresh: _reload,
                 child: ListView(physics: const AlwaysScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(16, 16, 16, 16), children: [
-                  if (list.isEmpty) Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(tr('Aucun client', 'لا زبائن')))),
+                  if (store.clients.isNotEmpty) _summary(ready, inactiveCount),
+                  if (list.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+                      child: Column(children: [
+                        Icon(store.clients.isEmpty ? Icons.qr_code_scanner_rounded : Icons.search_off_rounded, size: 56, color: kMuted),
+                        const SizedBox(height: 12),
+                        Text(store.clients.isEmpty ? tr('Pas encore de client', 'لا زبائن بعد') : tr('Aucun résultat', 'لا نتائج'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                        const SizedBox(height: 4),
+                        Text(store.clients.isEmpty ? tr('Scannez le QR d\'un client pour l\'ajouter ici.', 'امسح رمز زبون لإضافته هنا.') : tr('Essayez un autre filtre ou une autre recherche.', 'جرّب فلترًا أو بحثًا آخر.'), textAlign: TextAlign.center, style: const TextStyle(color: kMuted)),
+                      ]),
+                    ),
                   for (var i = 0; i < list.length; i++) FadeSlideIn(index: i, child: _tile(list[i], stats['${list[i]['client_id']}'])),
                 ]),
               ),
@@ -130,34 +141,101 @@ class _ClientsTabState extends State<ClientsTab> {
         },
       );
 
+  Widget _stat(IconData i, String v, String l, _Filter f, {bool hl = false}) => Expanded(
+        child: GestureDetector(
+          onTap: () => setState(() => filter = f),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            decoration: BoxDecoration(color: hl ? kAccent : cardColor(context), borderRadius: BorderRadius.circular(22), border: Border.all(color: filter == f ? (hl ? kInk : kAccent) : Colors.transparent, width: 2)),
+            child: Column(children: [
+              Icon(i, size: 22, color: hl ? kInk : null),
+              const SizedBox(height: 4),
+              Text(v, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: hl ? kInk : null)),
+              Text(l, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: hl ? kInk : kMuted)),
+            ]),
+          ),
+        ),
+      );
+
+  /// Trois compteurs cliquables : ils filtrent la liste.
+  Widget _summary(int ready, int inactive) => Padding(
+        padding: const EdgeInsets.only(bottom: 14),
+        child: Row(children: [
+          _stat(Icons.people_alt_rounded, '${store.clients.length}', tr('Clients', 'الزبائن'), _Filter.all),
+          const SizedBox(width: 8),
+          _stat(Icons.card_giftcard_rounded, '$ready', tr('À récompenser', 'للمكافأة'), _Filter.reward, hl: ready > 0),
+          const SizedBox(width: 8),
+          _stat(Icons.notifications_active_rounded, '$inactive', tr('À relancer', 'للتذكير'), _Filter.inactive),
+        ]),
+      );
+
+  Widget _badge(String t, Color bg, Color fg) => Container(
+        margin: const EdgeInsetsDirectional.only(start: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+        child: Text(t, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: fg)),
+      );
+
   Widget _tile(Map<String, dynamic> c, ClientStat? st) {
     final name = '${c['display_name']}';
     final pts = (c['points'] as num).toInt();
     final ready = pts >= store.threshold;
+    final left = store.threshold - pts;
+    final loyal = (st?.visits ?? 0) >= 4;
+    final inactive = _isInactive(c);
+    final dark = isDark(context);
+    Widget? badge;
+    if (ready) {
+      badge = _badge(tr('Récompense', 'مكافأة'), kAccent, kInk);
+    } else if (loyal) {
+      badge = _badge(tr('Fidèle', 'وفي'), kOk.withOpacity(0.15), kOk);
+    } else if (inactive) {
+      badge = _badge(tr('À relancer', 'للتذكير'), kWarn.withOpacity(0.15), kWarn);
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-      color: cardColor(context),
-      borderRadius: BorderRadius.circular(26),
-      clipBehavior: Clip.antiAlias,
-      child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => ClientSheet(client: c)),
-      leading: CircleAvatar(backgroundColor: ready ? kAccent : (isDark(context) ? const Color(0xFF3A372E) : Colors.white), child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.bold, color: ready ? kInk : null))),
-      title: Text(name),
-      subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('$pts ${tr('pts', 'نقطة')} · ${st?.visits ?? 0} ${tr('visites', 'زيارة')} · ${since(c['last_scan_at'] as String?)}'),
-        const SizedBox(height: 4),
-        ClipRRect(borderRadius: BorderRadius.circular(4), child: LinearProgressIndicator(value: (pts / store.threshold).clamp(0.0, 1.0), minHeight: 4)),
-      ]),
-      trailing: ready
-          ? FilledButton.tonal(
-              onPressed: () => validateWithOffer(context, '${c['client_id']}', name),
-              child: Text(tr('Valider', 'تأكيد')),
-            )
-          : const Icon(Icons.chevron_right_rounded),
-    ),
-    ),
+        color: cardColor(context),
+        borderRadius: BorderRadius.circular(26),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => showModalBottomSheet(context: context, isScrollControlled: true, showDragHandle: true, builder: (_) => ClientSheet(client: c)),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Row(children: [
+              // Avatar entouré d'un anneau de progression vers la récompense
+              SizedBox(
+                width: 56,
+                height: 56,
+                child: Stack(alignment: Alignment.center, children: [
+                  SizedBox(width: 56, height: 56, child: CircularProgressIndicator(value: (pts / store.threshold).clamp(0.0, 1.0), strokeWidth: 4, backgroundColor: dark ? const Color(0xFF3A372E) : Colors.white, color: ready ? kOk : kBronze)),
+                  CircleAvatar(radius: 20, backgroundColor: ready ? kAccent : (dark ? const Color(0xFF3A372E) : Colors.white), child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontWeight: FontWeight.w800, color: ready ? kInk : null))),
+                ]),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Flexible(child: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800))),
+                    if (badge != null) badge,
+                  ]),
+                  const SizedBox(height: 3),
+                  Text('$pts ${tr('pts', 'نقطة')} · ${st?.visits ?? 0} ${tr('visites', 'زيارة')} · ${since(c['last_scan_at'] as String?)}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, color: kMuted)),
+                  if (!ready) Text(tr('Plus que $left pts pour la récompense', 'بقي $left نقطة للمكافأة'), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                ]),
+              ),
+              const SizedBox(width: 8),
+              ready
+                  ? FilledButton(
+                      style: FilledButton.styleFrom(minimumSize: const Size(0, 40), padding: const EdgeInsets.symmetric(horizontal: 16)),
+                      onPressed: () => validateWithOffer(context, '${c['client_id']}', name),
+                      child: Text(tr('Valider', 'تأكيد')),
+                    )
+                  : const Icon(Icons.chevron_right_rounded, color: kMuted),
+            ]),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -190,7 +268,14 @@ class ClientSheet extends StatelessWidget {
       constraints: BoxConstraints(maxHeight: h * 0.85),
       child: ListView(padding: const EdgeInsets.fromLTRB(20, 0, 20, 24), shrinkWrap: true, children: [
         Row(children: [
-          CircleAvatar(radius: 28, backgroundColor: Theme.of(context).colorScheme.secondaryContainer, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold))),
+          SizedBox(
+            width: 76,
+            height: 76,
+            child: Stack(alignment: Alignment.center, children: [
+              SizedBox(width: 76, height: 76, child: CircularProgressIndicator(value: (pts / store.threshold).clamp(0.0, 1.0), strokeWidth: 5, backgroundColor: Theme.of(context).colorScheme.secondaryContainer, color: ready ? kOk : kBronze)),
+              CircleAvatar(radius: 28, backgroundColor: ready ? kAccent : Theme.of(context).colorScheme.secondaryContainer, child: Text(name.isEmpty ? '?' : name[0].toUpperCase(), style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: ready ? kInk : null))),
+            ]),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
