@@ -28,6 +28,57 @@ jobs:
           sed -i 's|<application|<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.CAMERA"/>\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n    <application|' android/app/src/main/AndroidManifest.xml
           sed -i 's|android:label="nqata_merchant"|android:label="Nqata Pro"|' android/app/src/main/AndroidManifest.xml
 
+      - name: Configurer la signature
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then echo "Secret KEYSTORE_BASE64 manquant"; exit 1; fi
+          echo "$KEYSTORE_BASE64" | base64 -d > android/app/nqata-release.jks
+          cat > android/key.properties <<PROPS
+          storePassword=$KEYSTORE_PASSWORD
+          keyPassword=$KEY_PASSWORD
+          keyAlias=$KEY_ALIAS
+          storeFile=nqata-release.jks
+          PROPS
+          sed -i 's/^ *//' android/key.properties
+          python3 - <<'PY'
+          import os
+          kts = "android/app/build.gradle.kts"
+          grv = "android/app/build.gradle"
+          if os.path.exists(kts):
+              s = open(kts).read()
+              head = ('import java.util.Properties\nimport java.io.FileInputStream\n\n'
+                      'val keystoreProperties = Properties()\n'
+                      'val keystorePropertiesFile = rootProject.file("key.properties")\n'
+                      'if (keystorePropertiesFile.exists()) { keystoreProperties.load(FileInputStream(keystorePropertiesFile)) }\n\n')
+              block = ('    signingConfigs {\n        create("release") {\n'
+                       '            keyAlias = keystoreProperties["keyAlias"] as String\n'
+                       '            keyPassword = keystoreProperties["keyPassword"] as String\n'
+                       '            storeFile = file(keystoreProperties["storeFile"] as String)\n'
+                       '            storePassword = keystoreProperties["storePassword"] as String\n'
+                       '        }\n    }\n\n    buildTypes {')
+              s = head + s.replace("    buildTypes {", block, 1)
+              s = s.replace('signingConfigs.getByName("debug")', 'signingConfigs.getByName("release")')
+              open(kts, "w").write(s)
+          else:
+              s = open(grv).read()
+              head = ('def keystoreProperties = new Properties()\n'
+                      'def keystorePropertiesFile = rootProject.file("key.properties")\n'
+                      'if (keystorePropertiesFile.exists()) { keystoreProperties.load(new FileInputStream(keystorePropertiesFile)) }\n\n')
+              block = ('    signingConfigs {\n        release {\n'
+                       '            keyAlias keystoreProperties["keyAlias"]\n'
+                       '            keyPassword keystoreProperties["keyPassword"]\n'
+                       '            storeFile file(keystoreProperties["storeFile"])\n'
+                       '            storePassword keystoreProperties["storePassword"]\n'
+                       '        }\n    }\n\n    buildTypes {')
+              s = head + s.replace("    buildTypes {", block, 1)
+              s = s.replace("signingConfig signingConfigs.debug", "signingConfig signingConfigs.release")
+              open(grv, "w").write(s)
+          PY
+
       - run: flutter pub get
       - name: Icône de l'app
         run: dart run flutter_launcher_icons
